@@ -69,6 +69,35 @@ export function displayResults(result: EnsembleResult): void {
     }
   }
 
+  // Scoring breakdown
+  if (result.scores.length > 0) {
+    console.log(pc.bold("Scoring"));
+    console.log(pc.dim("─".repeat(60)));
+    console.log(
+      "  " +
+        padRight("Agent", 8) +
+        padRight("Tests", 10) +
+        padRight("Converge", 10) +
+        padRight("Diff", 10) +
+        padRight("Total", 10),
+    );
+    console.log("  " + pc.dim("─".repeat(48)));
+
+    for (const score of result.scores) {
+      const isRecommended = result.recommended === score.agentId;
+      const prefix = isRecommended ? pc.cyan(">>") : "  ";
+      console.log(
+        prefix +
+          padRight(`#${score.agentId}`, 8) +
+          padRight(String(score.testPoints), 10) +
+          padRight(String(score.convergencePoints), 10) +
+          padRight(String(score.diffSizePoints), 10) +
+          padRight(String(score.total), 10),
+      );
+    }
+    console.log();
+  }
+
   // Recommendation
   if (result.recommended !== null) {
     console.log(

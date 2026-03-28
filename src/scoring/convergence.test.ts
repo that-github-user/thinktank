@@ -93,7 +93,9 @@ describe("analyzeConvergence", () => {
 describe("recommend", () => {
   it("returns null for no completed agents", () => {
     const agents = [makeAgent({ id: 1, status: "error", diff: "" })];
-    assert.equal(recommend(agents, [], []), null);
+    const result = recommend(agents, [], []);
+    assert.equal(result.recommended, null);
+    assert.deepEqual(result.scores, []);
   });
 
   it("prefers agents that pass tests", () => {
@@ -106,8 +108,9 @@ describe("recommend", () => {
       { agentId: 2, passed: false },
     ];
     const convergence = analyzeConvergence(agents);
+    const result = recommend(agents, tests, convergence);
 
-    assert.equal(recommend(agents, tests, convergence), 1);
+    assert.equal(result.recommended, 1);
   });
 
   it("prefers agents in larger convergence group when tests are equal", () => {
@@ -128,10 +131,10 @@ describe("recommend", () => {
       { agentId: 3, passed: true },
     ];
     const convergence = analyzeConvergence(agents);
-    const rec = recommend(agents, tests, convergence);
+    const result = recommend(agents, tests, convergence);
 
     // Should pick agent 1 or 2 (in the majority group), not 3
-    assert.ok(rec === 1 || rec === 2);
+    assert.ok(result.recommended === 1 || result.recommended === 2);
   });
 
   it("prefers smaller diffs as tiebreaker", () => {
@@ -140,7 +143,58 @@ describe("recommend", () => {
       makeAgent({ id: 2, diff: DIFF_A, linesAdded: 5, linesRemoved: 2 }),
     ];
     const convergence = analyzeConvergence(agents);
+    const result = recommend(agents, [], convergence);
 
-    assert.equal(recommend(agents, [], convergence), 2);
+    assert.equal(result.recommended, 2);
+  });
+
+  it("returns per-agent score breakdowns", () => {
+    const agents = [
+      makeAgent({ id: 1, diff: DIFF_A, linesAdded: 20, linesRemoved: 10 }),
+      makeAgent({ id: 2, diff: DIFF_B, linesAdded: 5, linesRemoved: 2, filesChanged: ["b.ts"] }),
+    ];
+    const tests = [
+      { agentId: 1, passed: true },
+      { agentId: 2, passed: false },
+    ];
+    const convergence = analyzeConvergence(agents);
+    const result = recommend(agents, tests, convergence);
+
+    assert.equal(result.scores.length, 2);
+
+    const score1 = result.scores.find((s) => s.agentId === 1);
+    const score2 = result.scores.find((s) => s.agentId === 2);
+    assert.ok(score1);
+    assert.ok(score2);
+
+    assert.equal(score1.testPoints, 100);
+    assert.equal(score2.testPoints, 0);
+
+    assert.ok(score1.convergencePoints >= 0);
+    assert.ok(score1.diffSizePoints >= 0);
+    assert.equal(
+      score1.total,
+      score1.testPoints + score1.convergencePoints + score1.diffSizePoints,
+    );
+    assert.equal(
+      score2.total,
+      score2.testPoints + score2.convergencePoints + score2.diffSizePoints,
+    );
+  });
+
+  it("gives higher diffSizePoints to smaller diffs", () => {
+    const agents = [
+      makeAgent({ id: 1, diff: DIFF_A, linesAdded: 50, linesRemoved: 20 }),
+      makeAgent({ id: 2, diff: DIFF_A, linesAdded: 5, linesRemoved: 2 }),
+    ];
+    const convergence = analyzeConvergence(agents);
+    const result = recommend(agents, [], convergence);
+
+    const score1 = result.scores.find((s) => s.agentId === 1);
+    const score2 = result.scores.find((s) => s.agentId === 2);
+    assert.ok(score1);
+    assert.ok(score2);
+
+    assert.ok(score2.diffSizePoints > score1.diffSizePoints);
   });
 });
