@@ -1,9 +1,9 @@
+import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { EnsembleResult } from "../types.js";
-import { removeWorktree, cleanupBranches, getRepoRoot } from "../utils/git.js";
+import { cleanupBranches, getRepoRoot, removeWorktree } from "../utils/git.js";
 
 const exec = promisify(execFile);
 
@@ -32,9 +32,7 @@ export async function apply(opts: ApplyOptions): Promise<void> {
   const agent = result.agents.find((a) => a.id === agentId);
   if (!agent) {
     console.error(`  Agent #${agentId} not found in results.`);
-    console.error(
-      `  Available agents: ${result.agents.map((a) => `#${a.id}`).join(", ")}`
-    );
+    console.error(`  Available agents: ${result.agents.map((a) => `#${a.id}`).join(", ")}`);
     process.exit(1);
   }
 

@@ -5,12 +5,8 @@ import type { AgentResult, ConvergenceGroup } from "../types.js";
  * each agent changed. Agents that changed the same set of files are
  * grouped together — a larger group = higher confidence.
  */
-export function analyzeConvergence(
-  agents: AgentResult[]
-): ConvergenceGroup[] {
-  const completed = agents.filter(
-    (a) => a.status === "success" && a.diff.length > 0
-  );
+export function analyzeConvergence(agents: AgentResult[]): ConvergenceGroup[] {
+  const completed = agents.filter((a) => a.status === "success" && a.diff.length > 0);
 
   if (completed.length === 0) return [];
 
@@ -60,7 +56,7 @@ export function analyzeConvergence(
 export function recommend(
   agents: AgentResult[],
   testResults: Array<{ agentId: number; passed: boolean }>,
-  convergence: ConvergenceGroup[]
+  convergence: ConvergenceGroup[],
 ): number | null {
   const completed = agents.filter((a) => a.status === "success" && a.diff.length > 0);
   if (completed.length === 0) return null;

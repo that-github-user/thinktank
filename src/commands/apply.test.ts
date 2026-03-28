@@ -1,5 +1,5 @@
-import { describe, it, beforeEach, mock } from "node:test";
 import assert from "node:assert/strict";
+import { beforeEach, describe, it, mock } from "node:test";
 
 // Test the logic of agent selection without actually running git commands
 describe("apply agent selection logic", () => {
