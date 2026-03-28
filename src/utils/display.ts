@@ -99,7 +99,7 @@ export function displayApplyInstructions(result: EnsembleResult): void {
   console.log();
 }
 
-function padRight(str: string, len: number): string {
+export function padRight(str: string, len: number): string {
   // Strip ANSI codes for length calculation
   // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional ANSI escape sequence matching
   const stripped = str.replace(/\x1b\[[0-9;]*m/g, "");
@@ -107,7 +107,7 @@ function padRight(str: string, len: number): string {
   return str + " ".repeat(padding);
 }
 
-function formatDuration(ms: number): string {
+export function formatDuration(ms: number): string {
   const seconds = Math.round(ms / 1000);
   if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
