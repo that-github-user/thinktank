@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/cli.ts",
-    "test": "node --test dist/**/*.test.js"
+    "test": "tsx --test src/**/*.test.ts"
   },
   "keywords": ["ai", "coding", "ensemble", "claude", "claude-code", "consensus"],
   "author": "",
