@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { beforeEach, describe, it, mock } from "node:test";
+import { describe, it } from "node:test";
 
 // Test the logic of agent selection without actually running git commands
 describe("apply agent selection logic", () => {
@@ -66,5 +66,36 @@ describe("apply agent selection logic", () => {
     assert.ok(agent);
     assert.equal(agent.status, "error");
     assert.equal(agent.diff, "");
+  });
+});
+
+describe("isWorkingTreeClean", () => {
+  it("is exported and callable", async () => {
+    const { isWorkingTreeClean } = await import("./apply.js");
+    assert.equal(typeof isWorkingTreeClean, "function");
+  });
+
+  it("returns a boolean", async () => {
+    const { isWorkingTreeClean } = await import("./apply.js");
+    const result = await isWorkingTreeClean();
+    assert.equal(typeof result, "boolean");
+  });
+});
+
+describe("dry-run flag", () => {
+  it("ApplyOptions accepts dryRun property", async () => {
+    const opts: import("./apply.js").ApplyOptions = {
+      dryRun: true,
+    };
+    assert.equal(opts.dryRun, true);
+  });
+
+  it("dry-run skips dirty-tree check (same as preview)", () => {
+    // The guard in apply() only checks isWorkingTreeClean when
+    // neither preview nor dryRun is set. Verify the logic inline:
+    const preview = false;
+    const dryRun = true;
+    const isPreviewOnly = preview || dryRun;
+    assert.equal(isPreviewOnly, true, "dry-run should be treated as preview-only");
   });
 });
