@@ -57,7 +57,12 @@ Closes #N
 - `gh pr merge <number> --squash --delete-branch`
 - `git checkout main && git pull`
 
-### Step 7: File new issues if needed
+### Step 7: Comment on the closed issue
+- ALWAYS add a closing comment on the issue summarizing what was done:
+  `gh issue comment N --body "Fixed in #PR. Brief summary of what changed."`
+- This is important — the issue history should be self-contained. Don't let auto-close be the only signal.
+
+### Step 8: File new issues if needed
 - If you discover something out of scope, file it with `gh issue create`
 - Be specific and actionable
 
