@@ -55,6 +55,20 @@ diff --git a/b.ts b/b.ts
     assert.deepEqual(parseDiff(""), []);
   });
 
+  it("skips binary file entries", () => {
+    const binaryDiff = `diff --git a/image.png b/image.png
+index abc1234..def5678 100644
+Binary files a/image.png and b/image.png differ
+diff --git a/src/auth.ts b/src/auth.ts
+--- a/src/auth.ts
++++ b/src/auth.ts
+@@ -1 +1 @@
++const x = 1;`;
+    const files = parseDiff(binaryDiff);
+    assert.equal(files.length, 1);
+    assert.equal(files[0]!.path, "src/auth.ts");
+  });
+
   it("handles filenames with spaces (quoted paths)", () => {
     const quotedDiff = `diff --git "a/src/my component.tsx" "b/src/my component.tsx"
 --- "a/src/my component.tsx"
