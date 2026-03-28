@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import pc from "picocolors";
 import type { EnsembleResult } from "../types.js";
 import { cleanupBranches, getRepoRoot, removeWorktree } from "../utils/git.js";
 
@@ -9,6 +10,7 @@ const exec = promisify(execFile);
 
 export interface ApplyOptions {
   agent?: number;
+  preview?: boolean;
 }
 
 export async function apply(opts: ApplyOptions): Promise<void> {
@@ -39,6 +41,34 @@ export async function apply(opts: ApplyOptions): Promise<void> {
   if (agent.status !== "success" || !agent.diff) {
     console.error(`  Agent #${agentId} has no changes to apply (status: ${agent.status}).`);
     process.exit(1);
+  }
+
+  // Preview mode: show diff and exit
+  if (opts.preview) {
+    console.log();
+    console.log(pc.bold(`  Agent #${agentId} diff:`));
+    console.log(pc.dim("  " + "─".repeat(58)));
+    console.log();
+    for (const line of agent.diff.split("\n")) {
+      if (line.startsWith("+") && !line.startsWith("+++")) {
+        console.log(pc.green(`  ${line}`));
+      } else if (line.startsWith("-") && !line.startsWith("---")) {
+        console.log(pc.red(`  ${line}`));
+      } else if (line.startsWith("@@")) {
+        console.log(pc.cyan(`  ${line}`));
+      } else {
+        console.log(pc.dim(`  ${line}`));
+      }
+    }
+    console.log();
+    console.log(`  Files: ${agent.filesChanged.join(", ")}`);
+    console.log(`  Changes: +${agent.linesAdded}/-${agent.linesRemoved}`);
+    console.log();
+    console.log(
+      pc.dim("  To apply: thinktank apply" + (opts.agent ? ` --agent ${opts.agent}` : "")),
+    );
+    console.log();
+    return;
   }
 
   // Apply the diff

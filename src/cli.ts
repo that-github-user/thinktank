@@ -57,9 +57,11 @@ program
   .command("apply")
   .description("Apply the recommended (or selected) agent's changes to your repo")
   .option("-a, --agent <number>", "Apply a specific agent's changes instead of the recommended one")
+  .option("-p, --preview", "Show the diff without applying")
   .action(async (opts) => {
     await apply({
       agent: opts.agent ? parseInt(opts.agent, 10) : undefined,
+      preview: opts.preview ?? false,
     });
   });
 
