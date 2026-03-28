@@ -4,9 +4,11 @@ import { Command } from "commander";
 import { apply } from "./commands/apply.js";
 import { clean } from "./commands/clean.js";
 import { compare } from "./commands/compare.js";
+import { type ConfigAction, config } from "./commands/config.js";
 import { list } from "./commands/list.js";
 import { run } from "./commands/run.js";
 import { stats } from "./commands/stats.js";
+import { loadConfig } from "./utils/config.js";
 import { resolvePrompt } from "./utils/prompt.js";
 
 const program = new Command();
@@ -18,18 +20,28 @@ program
   )
   .version("0.1.0");
 
+const cfg = loadConfig();
+
 program
   .command("run")
   .description("Run a task with N parallel AI coding agents")
   .argument("[prompt]", "The coding task to perform")
-  .option("-n, --attempts <number>", "Number of parallel attempts", "3")
+  .option("-n, --attempts <number>", "Number of parallel attempts", String(cfg.attempts))
   .option("-f, --file <path>", "Read prompt from a file (avoids shell expansion issues)")
   .option("-t, --test-cmd <command>", "Test command to verify results (e.g., 'npm test')")
-  .option("--test-timeout <seconds>", "Timeout for test command in seconds", "120")
-  .option("--timeout <seconds>", "Timeout per agent in seconds", "300")
-  .option("--model <model>", "Claude model to use", "sonnet")
-  .option("-r, --runner <name>", "AI coding tool to use (default: claude-code)")
-  .option("--threshold <number>", "Convergence clustering similarity threshold (0.0-1.0)", "0.3")
+  .option(
+    "--test-timeout <seconds>",
+    "Timeout for test command in seconds",
+    String(cfg.testTimeout),
+  )
+  .option("--timeout <seconds>", "Timeout per agent in seconds", String(cfg.timeout))
+  .option("--model <model>", "Claude model to use", cfg.model)
+  .option("-r, --runner <name>", "AI coding tool to use", cfg.runner)
+  .option(
+    "--threshold <number>",
+    "Convergence clustering similarity threshold (0.0-1.0)",
+    String(cfg.threshold),
+  )
   .option("--verbose", "Show detailed output from each agent")
   .action(async (promptArg: string | undefined, opts) => {
     const prompt = resolvePrompt(promptArg, opts.file);
@@ -124,6 +136,31 @@ program
   .description("Show aggregate statistics across all thinktank runs")
   .action(async () => {
     await stats();
+  });
+
+const configCmd = program
+  .command("config")
+  .description("View and update thinktank configuration (.thinktank/config.json)");
+
+configCmd
+  .command("set <key> <value>")
+  .description("Set a config value")
+  .action((key: string, value: string) => {
+    config("set", key, value);
+  });
+
+configCmd
+  .command("get <key>")
+  .description("Get a config value")
+  .action((key: string) => {
+    config("get", key);
+  });
+
+configCmd
+  .command("list")
+  .description("List all config values")
+  .action(() => {
+    config("list");
   });
 
 program.parse();
