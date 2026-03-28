@@ -43,7 +43,7 @@ program
     "Convergence clustering similarity threshold (0.0-1.0)",
     String(cfg.threshold),
   )
-  .option("--scoring <method>", "Scoring method: weighted (default) or copeland", "weighted")
+  .option("--scoring <method>", "Scoring method: copeland (default) or weighted", "copeland")
   .option("--verbose", "Show detailed output from each agent")
   .action(async (promptArg: string | undefined, opts) => {
     const prompt = resolvePrompt(promptArg, opts.file);
