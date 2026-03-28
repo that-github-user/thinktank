@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getDefaultRunner, getRunner } from "../runners/registry.js";
 import { analyzeConvergence, copelandRecommend, recommend } from "../scoring/convergence.js";
@@ -28,6 +28,207 @@ export async function preflightValidation(opts: RunOptions): Promise<string | nu
   }
 
   return null;
+}
+
+/**
+ * Load the latest ensemble result from .thinktank/latest.json.
+ * Returns null if the file doesn't exist or can't be parsed.
+ */
+export async function loadLatestResult(): Promise<EnsembleResult | null> {
+  try {
+    const data = await readFile(join(".thinktank", "latest.json"), "utf-8");
+    return JSON.parse(data) as EnsembleResult;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Identify agents from a previous result that failed (error or timeout).
+ */
+export function findFailedAgents(result: EnsembleResult): AgentResult[] {
+  return result.agents.filter((a) => a.status === "error" || a.status === "timeout");
+}
+
+/**
+ * Merge retried agent results back into the original result set,
+ * replacing agents that were retried.
+ */
+export function mergeRetryResults(
+  original: EnsembleResult,
+  retriedAgents: AgentResult[],
+): AgentResult[] {
+  const retriedIds = new Set(retriedAgents.map((a) => a.id));
+  return original.agents.map((a) => {
+    if (retriedIds.has(a.id)) {
+      const retried = retriedAgents.find((r) => r.id === a.id);
+      return retried!;
+    }
+    return a;
+  });
+}
+
+export async function retry(opts: RunOptions): Promise<void> {
+  // Load previous result
+  const previous = await loadLatestResult();
+  if (!previous) {
+    console.error("  No previous run found. Run 'thinktank run' first.");
+    process.exit(1);
+  }
+
+  const failed = findFailedAgents(previous);
+  if (failed.length === 0) {
+    console.log("  All agents succeeded in the last run — nothing to retry.");
+    return;
+  }
+
+  const failedIds = failed.map((a) => a.id);
+  console.log();
+  console.log(
+    `  Retrying ${failed.length} failed agent(s): ${failedIds.map((id) => `#${id}`).join(", ")}`,
+  );
+  console.log(`  Prompt:   ${previous.prompt}`);
+  console.log(`  Model:    ${previous.model}`);
+  console.log();
+
+  // Resolve runner
+  const runner = opts.runner ? getRunner(opts.runner) : getDefaultRunner();
+  if (!runner) {
+    console.error(`  Unknown runner: ${opts.runner}`);
+    console.error("  Available runners: claude-code");
+    process.exit(1);
+  }
+
+  const isAvailable = await runner.available();
+  if (!isAvailable) {
+    console.error(
+      `  Runner "${runner.name}" is not available. Is ${runner.description} installed?`,
+    );
+    process.exit(1);
+  }
+
+  // Pre-flight validation (use previous prompt)
+  const preflightError = await preflightValidation({
+    ...opts,
+    prompt: previous.prompt,
+  });
+  if (preflightError) {
+    console.error(`  ${preflightError}`);
+    process.exit(1);
+  }
+
+  // Clean up old worktrees
+  await cleanupBranches().catch(() => {});
+
+  // Phase 1: Create worktrees only for failed agents
+  console.log("  Creating worktrees for failed agents...");
+  const worktrees: Array<{ id: number; path: string }> = [];
+
+  const handleSigint = () => {
+    console.log("\n\n  Interrupted — cleaning up worktrees...");
+    Promise.all(worktrees.map(({ path }) => removeWorktree(path).catch(() => {})))
+      .then(() => cleanupBranches().catch(() => {}))
+      .then(() => process.exit(130));
+  };
+  process.on("SIGINT", handleSigint);
+
+  const worktreeResults = await Promise.all(
+    failedIds.map((id) => createWorktree(id).then((path) => ({ id, path }))),
+  );
+  for (const wt of worktreeResults) {
+    worktrees.push(wt);
+    console.log(`    Agent #${wt.id}: ${wt.path}`);
+  }
+  console.log();
+
+  // Phase 2: Re-run failed agents with original prompt
+  console.log(`  Re-running ${failed.length} agent(s) in parallel (${runner.name})...`);
+  console.log();
+
+  const agentPromises = worktrees.map(({ id, path }) =>
+    runner.run(id, {
+      prompt: previous.prompt,
+      worktreePath: path,
+      model: previous.model,
+      timeout: opts.timeout,
+      verbose: opts.verbose,
+    }),
+  );
+
+  const retriedAgents: AgentResult[] = await Promise.all(agentPromises);
+
+  for (const agent of retriedAgents) {
+    const icon = agent.status === "success" ? "✓" : agent.status === "timeout" ? "⏱" : "✗";
+    const files = agent.filesChanged.length;
+    console.log(
+      `    Agent #${agent.id}: ${icon} ${agent.status} — ${files} files changed in ${Math.round(agent.duration / 1000)}s`,
+    );
+  }
+  console.log();
+
+  // Phase 3: Merge retried agents back into original results
+  const mergedAgents = mergeRetryResults(previous, retriedAgents);
+
+  // Phase 4: Run tests on ALL agents (retried get fresh tests, keep old test results for others)
+  let testResults = [...previous.tests];
+
+  if (opts.testCmd) {
+    console.log(`  Running tests: ${opts.testCmd}`);
+    const testTimeoutMs = opts.testTimeout * 1000;
+
+    // Run tests only on retried agents' worktrees
+    const retryTestPromises = worktrees.map(({ id, path }) =>
+      runTests(id, opts.testCmd!, path, testTimeoutMs),
+    );
+    const retryTestResults = await Promise.all(retryTestPromises);
+
+    // Replace test results for retried agents
+    const retriedIds = new Set(failedIds);
+    testResults = testResults.filter((t) => !retriedIds.has(t.agentId));
+    testResults.push(...retryTestResults);
+
+    for (const test of retryTestResults) {
+      const icon = test.passed ? "✓" : "✗";
+      console.log(`    Agent #${test.agentId}: ${icon} tests ${test.passed ? "passed" : "failed"}`);
+    }
+    console.log();
+  }
+
+  // Phase 5: Convergence analysis on full merged set
+  const convergence = analyzeConvergence(mergedAgents, opts.threshold);
+
+  // Phase 6: Recommendation
+  const { recommended: weightedRec, scores } = recommend(mergedAgents, testResults, convergence);
+  const copeland = copelandRecommend(mergedAgents, testResults, convergence);
+
+  const recommended = opts.scoring === "copeland" ? copeland.recommended : weightedRec;
+
+  // Build result object
+  const result: EnsembleResult = {
+    prompt: previous.prompt,
+    model: previous.model,
+    timestamp: new Date().toISOString(),
+    scoring: opts.scoring,
+    agents: mergedAgents,
+    tests: testResults,
+    convergence,
+    recommended,
+    scores,
+    copelandScores: copeland.scores,
+  };
+
+  // Display results
+  if (opts.outputFormat === "json") {
+    console.log(JSON.stringify(result));
+  } else {
+    displayResults(result);
+    displayApplyInstructions(result);
+  }
+
+  // Save result
+  await saveResult(result);
+
+  process.removeListener("SIGINT", handleSigint);
 }
 
 export async function run(opts: RunOptions): Promise<void> {
