@@ -1,12 +1,27 @@
-import { exec as execCb } from "node:child_process";
+import { execFile } from "node:child_process";
 import { access } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import type { TestResult } from "../types.js";
 
-const exec = promisify(execCb);
+const exec = promisify(execFile);
 
 const TEST_TIMEOUT_MS = 120_000;
+
+/** Shell operators that indicate command chaining — reject these. */
+const SHELL_OPERATORS = /[;|&`><]/;
+
+/**
+ * Validate a test command for safety. Rejects commands containing
+ * shell operators that could be used for injection.
+ */
+export function validateTestCommand(testCmd: string): string | null {
+  if (!testCmd.trim()) return "Empty test command";
+  if (SHELL_OPERATORS.test(testCmd)) {
+    return `Test command contains shell operators which are not allowed for security: ${testCmd}`;
+  }
+  return null;
+}
 
 /**
  * Parse a test command string into command + args.
@@ -21,7 +36,6 @@ export function parseTestCommand(testCmd: string): { cmd: string; args: string[]
 
 /**
  * Verify the test command is likely to work in the given directory.
- * Checks for package.json (npm/npx), Makefile (make), etc.
  */
 async function checkTestPrerequisites(cmd: string, worktreePath: string): Promise<string | null> {
   if (cmd === "npm" || cmd === "npx") {
@@ -39,6 +53,17 @@ export async function runTests(
   testCmd: string,
   worktreePath: string,
 ): Promise<TestResult> {
+  // Security: validate command before execution
+  const validationError = validateTestCommand(testCmd);
+  if (validationError) {
+    return {
+      agentId,
+      passed: false,
+      output: validationError,
+      exitCode: 1,
+    };
+  }
+
   const { cmd, args } = parseTestCommand(testCmd);
 
   if (!cmd) {
@@ -62,10 +87,12 @@ export async function runTests(
   }
 
   try {
-    // Use shell execution so npx, npm, etc. resolve correctly on all platforms
-    const { stdout, stderr } = await exec(testCmd, {
+    // Use execFile with shell:true for cross-platform command resolution
+    // while keeping args as an array to prevent injection via arguments.
+    const { stdout, stderr } = await exec(cmd, args, {
       cwd: worktreePath,
       timeout: TEST_TIMEOUT_MS,
+      shell: true,
       env: { ...process.env, CI: "true" },
     });
     return {
@@ -83,13 +110,21 @@ export async function runTests(
       signal?: string;
     };
 
-    // Distinguish timeout from test failure
     if (e.killed && e.signal === "SIGTERM") {
       return {
         agentId,
         passed: false,
         output: `Test command timed out after ${TEST_TIMEOUT_MS / 1000}s`,
         exitCode: 124,
+      };
+    }
+
+    if (typeof e.code === "string" && e.code === "ENOENT") {
+      return {
+        agentId,
+        passed: false,
+        output: `Command not found: ${cmd}. Is it installed?`,
+        exitCode: 127,
       };
     }
 
