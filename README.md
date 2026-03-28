@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="thinktank" width="200" />
+</p>
+
 # thinktank
 
 Ensemble AI coding. Run N parallel Claude Code agents on the same task, then select the best result via test execution and convergence analysis.

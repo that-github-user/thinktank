@@ -26,6 +26,13 @@ export async function runClaudeAgent(
       model,
       "--max-turns",
       "50",
+      "--allowedTools",
+      "Edit",
+      "Write",
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
     ];
 
     const child = spawn("claude", args, {
