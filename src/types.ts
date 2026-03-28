@@ -2,6 +2,7 @@ export interface RunOptions {
   prompt: string;
   attempts: number;
   testCmd?: string;
+  testTimeout: number;
   timeout: number;
   model: string;
   verbose: boolean;

@@ -77,8 +77,8 @@ export async function removeWorktree(worktreePath: string): Promise<void> {
 export async function getDiff(worktreePath: string): Promise<string> {
   try {
     // Include both staged and unstaged changes relative to HEAD
-    // First add all changes so they show in the diff
-    await exec("git", ["add", "-A"], { cwd: worktreePath });
+    // Exclude node_modules symlink (created by createWorktree for tool access)
+    await exec("git", ["add", "-A", "--", ".", ":!node_modules"], { cwd: worktreePath });
     const { stdout } = await exec("git", ["diff", "--cached", "HEAD"], {
       cwd: worktreePath,
     });
@@ -95,7 +95,7 @@ export async function getDiffStats(
   worktreePath: string,
 ): Promise<{ filesChanged: string[]; linesAdded: number; linesRemoved: number }> {
   try {
-    await exec("git", ["add", "-A"], { cwd: worktreePath });
+    await exec("git", ["add", "-A", "--", ".", ":!node_modules"], { cwd: worktreePath });
     const { stdout } = await exec("git", ["diff", "--cached", "--stat", "HEAD"], {
       cwd: worktreePath,
     });

@@ -7,6 +7,7 @@ function makeOpts(overrides: Partial<RunOptions> = {}): RunOptions {
   return {
     prompt: "fix the bug",
     attempts: 3,
+    testTimeout: 120,
     timeout: 300,
     model: "sonnet",
     verbose: false,

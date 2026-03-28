@@ -112,7 +112,10 @@ export async function run(opts: RunOptions): Promise<void> {
 
   if (opts.testCmd) {
     console.log(`  Running tests: ${opts.testCmd}`);
-    const testPromises = worktrees.map(({ id, path }) => runTests(id, opts.testCmd!, path));
+    const testTimeoutMs = opts.testTimeout * 1000;
+    const testPromises = worktrees.map(({ id, path }) =>
+      runTests(id, opts.testCmd!, path, testTimeoutMs),
+    );
     testResults = await Promise.all(testPromises);
 
     for (const test of testResults) {

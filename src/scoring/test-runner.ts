@@ -6,7 +6,7 @@ import type { TestResult } from "../types.js";
 
 const exec = promisify(execFile);
 
-const TEST_TIMEOUT_MS = 120_000;
+const DEFAULT_TEST_TIMEOUT_MS = 120_000;
 
 /** Shell operators that indicate command chaining — reject these. */
 const SHELL_OPERATORS = /[;|&`><]/;
@@ -52,6 +52,7 @@ export async function runTests(
   agentId: number,
   testCmd: string,
   worktreePath: string,
+  timeoutMs: number = DEFAULT_TEST_TIMEOUT_MS,
 ): Promise<TestResult> {
   // Security: validate command before execution
   const validationError = validateTestCommand(testCmd);
@@ -91,7 +92,7 @@ export async function runTests(
     // while keeping args as an array to prevent injection via arguments.
     const { stdout, stderr } = await exec(cmd, args, {
       cwd: worktreePath,
-      timeout: TEST_TIMEOUT_MS,
+      timeout: timeoutMs,
       shell: true,
       env: { ...process.env, CI: "true" },
     });
@@ -114,7 +115,7 @@ export async function runTests(
       return {
         agentId,
         passed: false,
-        output: `Test command timed out after ${TEST_TIMEOUT_MS / 1000}s`,
+        output: `Test command timed out after ${timeoutMs / 1000}s`,
         exitCode: 124,
       };
     }
