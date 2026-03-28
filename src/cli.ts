@@ -5,6 +5,7 @@ import { apply } from "./commands/apply.js";
 import { compare } from "./commands/compare.js";
 import { list } from "./commands/list.js";
 import { run } from "./commands/run.js";
+import { stats } from "./commands/stats.js";
 
 const program = new Command();
 
@@ -83,6 +84,13 @@ program
   .description("List results from the most recent ensemble run")
   .action(async () => {
     await list();
+  });
+
+program
+  .command("stats")
+  .description("Show aggregate statistics across all thinktank runs")
+  .action(async () => {
+    await stats();
   });
 
 program.parse();
