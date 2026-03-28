@@ -1,4 +1,4 @@
-import type { AgentResult, AgentScore, ConvergenceGroup } from "../types.js";
+import type { AgentResult, AgentScore, ConvergenceGroup, CopelandScore } from "../types.js";
 import { pairwiseSimilarity } from "./diff-parser.js";
 
 /**
@@ -175,4 +175,107 @@ export function recommend(
   }
 
   return { recommended: bestId, scores: agentScores };
+}
+
+/**
+ * Copeland pairwise scoring: compare every pair of agents head-to-head
+ * on three criteria (tests passed, convergence group size, files changed).
+ * For each pair, the agent winning more criteria gets +1, the loser gets -1, ties get 0.
+ * The agent with the highest Copeland score is recommended.
+ */
+export function copelandRecommend(
+  agents: AgentResult[],
+  testResults: Array<{ agentId: number; passed: boolean }>,
+  convergence: ConvergenceGroup[],
+): { recommended: number | null; scores: CopelandScore[] } {
+  const completed = agents.filter((a) => a.status === "success" && a.diff.length > 0);
+  if (completed.length === 0) return { recommended: null, scores: [] };
+
+  // Pre-compute per-agent criteria values
+  const agentData = completed.map((agent) => {
+    const test = testResults.find((t) => t.agentId === agent.id);
+    const testsPassed = test?.passed ? 1 : 0;
+    const group = convergence.find((g) => g.agents.includes(agent.id));
+    const groupSize = group ? group.agents.length : 0;
+    const filesChanged = agent.filesChanged.length;
+    return { id: agent.id, testsPassed, groupSize, filesChanged };
+  });
+
+  // Initialize scores
+  const scoreMap = new Map<number, CopelandScore>();
+  for (const data of agentData) {
+    scoreMap.set(data.id, {
+      agentId: data.id,
+      testsWins: 0,
+      convergenceWins: 0,
+      filesChangedWins: 0,
+      copelandTotal: 0,
+    });
+  }
+
+  // Pairwise comparison
+  for (let i = 0; i < agentData.length; i++) {
+    for (let j = i + 1; j < agentData.length; j++) {
+      const a = agentData[i]!;
+      const b = agentData[j]!;
+
+      let aWins = 0;
+      let bWins = 0;
+
+      // Criterion 1: tests passed (more is better)
+      if (a.testsPassed > b.testsPassed) {
+        aWins++;
+        scoreMap.get(a.id)!.testsWins++;
+        scoreMap.get(b.id)!.testsWins--;
+      } else if (b.testsPassed > a.testsPassed) {
+        bWins++;
+        scoreMap.get(b.id)!.testsWins++;
+        scoreMap.get(a.id)!.testsWins--;
+      }
+
+      // Criterion 2: convergence group size (larger is better)
+      if (a.groupSize > b.groupSize) {
+        aWins++;
+        scoreMap.get(a.id)!.convergenceWins++;
+        scoreMap.get(b.id)!.convergenceWins--;
+      } else if (b.groupSize > a.groupSize) {
+        bWins++;
+        scoreMap.get(b.id)!.convergenceWins++;
+        scoreMap.get(a.id)!.convergenceWins--;
+      }
+
+      // Criterion 3: files changed (fewer is better — minimal changes preferred)
+      if (a.filesChanged < b.filesChanged) {
+        aWins++;
+        scoreMap.get(a.id)!.filesChangedWins++;
+        scoreMap.get(b.id)!.filesChangedWins--;
+      } else if (b.filesChanged < a.filesChanged) {
+        bWins++;
+        scoreMap.get(b.id)!.filesChangedWins++;
+        scoreMap.get(a.id)!.filesChangedWins--;
+      }
+
+      // Overall Copeland: winner of more criteria gets +1, loser -1
+      if (aWins > bWins) {
+        scoreMap.get(a.id)!.copelandTotal++;
+        scoreMap.get(b.id)!.copelandTotal--;
+      } else if (bWins > aWins) {
+        scoreMap.get(b.id)!.copelandTotal++;
+        scoreMap.get(a.id)!.copelandTotal--;
+      }
+    }
+  }
+
+  const copelandScores = [...scoreMap.values()];
+
+  let bestId: number | null = null;
+  let bestScore = -Infinity;
+  for (const score of copelandScores) {
+    if (score.copelandTotal > bestScore) {
+      bestScore = score.copelandTotal;
+      bestId = score.agentId;
+    }
+  }
+
+  return { recommended: bestId, scores: copelandScores };
 }

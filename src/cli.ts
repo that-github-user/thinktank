@@ -42,6 +42,7 @@ program
     "Convergence clustering similarity threshold (0.0-1.0)",
     String(cfg.threshold),
   )
+  .option("--scoring <method>", "Scoring method: weighted (default) or copeland", "weighted")
   .option("--verbose", "Show detailed output from each agent")
   .action(async (promptArg: string | undefined, opts) => {
     const prompt = resolvePrompt(promptArg, opts.file);
@@ -70,6 +71,12 @@ program
       process.exit(1);
     }
 
+    const validScoring = ["weighted", "copeland"];
+    if (!validScoring.includes(opts.scoring)) {
+      console.error(`Error: --scoring must be one of: ${validScoring.join(", ")}`);
+      process.exit(1);
+    }
+
     const knownModels = ["sonnet", "opus", "haiku"];
     if (!knownModels.includes(opts.model) && !opts.model.startsWith("claude-")) {
       console.warn(
@@ -86,6 +93,7 @@ program
       model: opts.model,
       threshold,
       runner: opts.runner,
+      scoring: opts.scoring,
       verbose: opts.verbose ?? false,
     });
   });
