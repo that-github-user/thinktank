@@ -10,6 +10,7 @@
     "build": "tsc",
     "dev": "tsx src/cli.ts",
     "test": "tsx --test src/**/*.test.ts",
+    "prepublishOnly": "npm run build && npm test",
     "lint": "biome check src/",
     "lint:fix": "biome check --write src/",
     "format": "biome format --write src/"
@@ -24,6 +25,11 @@
   ],
   "author": "",
   "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "commander": "^14.0.3"
   },
