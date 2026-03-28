@@ -9,6 +9,7 @@ export interface RunOptions {
   verbose: boolean;
   runner?: string;
   scoring: "weighted" | "copeland";
+  outputFormat: "text" | "json";
 }
 
 export interface AgentResult {
