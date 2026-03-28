@@ -5,6 +5,7 @@ export interface RunOptions {
   timeout: number;
   model: string;
   verbose: boolean;
+  runner?: string;
 }
 
 export interface AgentResult {

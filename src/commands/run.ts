@@ -1,14 +1,30 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { runClaudeAgent } from "../runners/claude-code.js";
+import { getDefaultRunner, getRunner } from "../runners/registry.js";
 import { analyzeConvergence, recommend } from "../scoring/convergence.js";
 import { runTests } from "../scoring/test-runner.js";
 import type { AgentResult, EnsembleResult, RunOptions } from "../types.js";
 import { displayApplyInstructions, displayHeader, displayResults } from "../utils/display.js";
-import { cleanupBranches, createWorktree, removeWorktree } from "../utils/git.js";
+import { cleanupBranches, createWorktree } from "../utils/git.js";
 
 export async function run(opts: RunOptions): Promise<void> {
   displayHeader(opts.prompt, opts.attempts, opts.model);
+
+  // Resolve runner
+  const runner = opts.runner ? getRunner(opts.runner) : getDefaultRunner();
+  if (!runner) {
+    console.error(`  Unknown runner: ${opts.runner}`);
+    console.error("  Available runners: claude-code");
+    process.exit(1);
+  }
+
+  const isAvailable = await runner.available();
+  if (!isAvailable) {
+    console.error(
+      `  Runner "${runner.name}" is not available. Is ${runner.description} installed?`,
+    );
+    process.exit(1);
+  }
 
   // Clean up any leftover worktrees/branches from previous runs
   await cleanupBranches().catch(() => {});
@@ -25,11 +41,17 @@ export async function run(opts: RunOptions): Promise<void> {
   console.log();
 
   // Phase 2: Run agents in parallel
-  console.log(`  Running ${opts.attempts} agents in parallel...`);
+  console.log(`  Running ${opts.attempts} agents in parallel (${runner.name})...`);
   console.log();
 
   const agentPromises = worktrees.map(({ id, path }) =>
-    runClaudeAgent(id, opts.prompt, path, opts.model, opts.timeout, opts.verbose),
+    runner.run(id, {
+      prompt: opts.prompt,
+      worktreePath: path,
+      model: opts.model,
+      timeout: opts.timeout,
+      verbose: opts.verbose,
+    }),
   );
 
   const agents: AgentResult[] = await Promise.all(agentPromises);

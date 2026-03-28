@@ -1,118 +1,127 @@
 import { spawn } from "node:child_process";
 import type { AgentResult } from "../types.js";
 import { getDiff, getDiffStats } from "../utils/git.js";
+import type { Runner, RunnerOptions } from "./base.js";
 
-export async function runClaudeAgent(
-  id: number,
-  prompt: string,
-  worktreePath: string,
-  model: string,
-  timeout: number,
-  verbose: boolean,
-): Promise<AgentResult> {
-  const start = Date.now();
-
+async function isClaudeInstalled(): Promise<boolean> {
   return new Promise((resolve) => {
-    let output = "";
-    let error = "";
-    let settled = false;
+    const child = spawn("claude", ["--version"], { stdio: "ignore" });
+    child.on("close", (code) => resolve(code === 0));
+    child.on("error", () => resolve(false));
+  });
+}
 
-    const args = [
-      "-p",
-      prompt,
-      "--output-format",
-      "text",
-      "--model",
-      model,
-      "--max-turns",
-      "50",
-      "--allowedTools",
-      "Edit",
-      "Write",
-      "Read",
-      "Glob",
-      "Grep",
-      "Bash",
-    ];
+export const claudeCodeRunner: Runner = {
+  name: "claude-code",
+  description: "Claude Code CLI (claude -p)",
 
-    const child = spawn("claude", args, {
-      cwd: worktreePath,
-      stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env },
-    });
+  available: isClaudeInstalled,
 
-    child.stdout.on("data", (data: Buffer) => {
-      const chunk = data.toString();
-      output += chunk;
-      if (verbose) {
-        process.stdout.write(`  [agent ${id}] ${chunk}`);
-      }
-    });
+  async run(id: number, opts: RunnerOptions): Promise<AgentResult> {
+    const start = Date.now();
 
-    child.stderr.on("data", (data: Buffer) => {
-      error += data.toString();
-    });
+    return new Promise((resolve) => {
+      let output = "";
+      let error = "";
+      let settled = false;
 
-    const timer = setTimeout(() => {
-      if (!settled) {
+      const args = [
+        "-p",
+        opts.prompt,
+        "--output-format",
+        "text",
+        "--model",
+        opts.model,
+        "--max-turns",
+        "50",
+        "--allowedTools",
+        "Edit",
+        "Write",
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+      ];
+
+      const child = spawn("claude", args, {
+        cwd: opts.worktreePath,
+        stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env },
+      });
+
+      child.stdout.on("data", (data: Buffer) => {
+        const chunk = data.toString();
+        output += chunk;
+        if (opts.verbose) {
+          process.stdout.write(`  [agent ${id}] ${chunk}`);
+        }
+      });
+
+      child.stderr.on("data", (data: Buffer) => {
+        error += data.toString();
+      });
+
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          child.kill("SIGTERM");
+          resolve({
+            id,
+            worktree: opts.worktreePath,
+            status: "timeout",
+            exitCode: -1,
+            duration: Date.now() - start,
+            output,
+            error: `Timed out after ${opts.timeout}s`,
+            diff: "",
+            filesChanged: [],
+            linesAdded: 0,
+            linesRemoved: 0,
+          });
+        }
+      }, opts.timeout * 1000);
+
+      child.on("close", async (code) => {
+        clearTimeout(timer);
+        if (settled) return;
         settled = true;
-        child.kill("SIGTERM");
+
+        const duration = Date.now() - start;
+        const diff = await getDiff(opts.worktreePath);
+        const stats = await getDiffStats(opts.worktreePath);
+
         resolve({
           id,
-          worktree: worktreePath,
-          status: "timeout",
+          worktree: opts.worktreePath,
+          status: code === 0 ? "success" : "error",
+          exitCode: code ?? 1,
+          duration,
+          output,
+          error: error || undefined,
+          diff,
+          ...stats,
+        });
+      });
+
+      child.on("error", (err) => {
+        clearTimeout(timer);
+        if (settled) return;
+        settled = true;
+
+        resolve({
+          id,
+          worktree: opts.worktreePath,
+          status: "error",
           exitCode: -1,
           duration: Date.now() - start,
           output,
-          error: `Timed out after ${timeout}s`,
+          error: err.message,
           diff: "",
           filesChanged: [],
           linesAdded: 0,
           linesRemoved: 0,
         });
-      }
-    }, timeout * 1000);
-
-    child.on("close", async (code) => {
-      clearTimeout(timer);
-      if (settled) return;
-      settled = true;
-
-      const duration = Date.now() - start;
-      const diff = await getDiff(worktreePath);
-      const stats = await getDiffStats(worktreePath);
-
-      resolve({
-        id,
-        worktree: worktreePath,
-        status: code === 0 ? "success" : "error",
-        exitCode: code ?? 1,
-        duration,
-        output,
-        error: error || undefined,
-        diff,
-        ...stats,
       });
     });
-
-    child.on("error", (err) => {
-      clearTimeout(timer);
-      if (settled) return;
-      settled = true;
-
-      resolve({
-        id,
-        worktree: worktreePath,
-        status: "error",
-        exitCode: -1,
-        duration: Date.now() - start,
-        output,
-        error: err.message,
-        diff: "",
-        filesChanged: [],
-        linesAdded: 0,
-        linesRemoved: 0,
-      });
-    });
-  });
-}
+  },
+};

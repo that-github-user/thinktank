@@ -17,12 +17,13 @@ program
 
 program
   .command("run")
-  .description("Run a task with N parallel Claude Code agents")
+  .description("Run a task with N parallel AI coding agents")
   .argument("<prompt>", "The coding task to perform")
   .option("-n, --attempts <number>", "Number of parallel attempts", "3")
   .option("-t, --test-cmd <command>", "Test command to verify results (e.g., 'npm test')")
   .option("--timeout <seconds>", "Timeout per agent in seconds", "300")
   .option("--model <model>", "Claude model to use", "sonnet")
+  .option("-r, --runner <name>", "AI coding tool to use (default: claude-code)")
   .option("--verbose", "Show detailed output from each agent")
   .action(async (prompt: string, opts) => {
     const attempts = parseInt(opts.attempts, 10);
@@ -50,6 +51,7 @@ program
       testCmd: opts.testCmd,
       timeout,
       model: opts.model,
+      runner: opts.runner,
       verbose: opts.verbose ?? false,
     });
   });
