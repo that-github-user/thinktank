@@ -3,6 +3,7 @@
 import { Command } from "commander";
 import { run } from "./commands/run.js";
 import { list } from "./commands/list.js";
+import { apply } from "./commands/apply.js";
 
 const program = new Command();
 
@@ -33,6 +34,16 @@ program
       timeout: parseInt(opts.timeout, 10),
       model: opts.model,
       verbose: opts.verbose ?? false,
+    });
+  });
+
+program
+  .command("apply")
+  .description("Apply the recommended (or selected) agent's changes to your repo")
+  .option("-a, --agent <number>", "Apply a specific agent's changes instead of the recommended one")
+  .action(async (opts) => {
+    await apply({
+      agent: opts.agent ? parseInt(opts.agent, 10) : undefined,
     });
   });
 
