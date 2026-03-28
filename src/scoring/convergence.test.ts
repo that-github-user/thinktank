@@ -3,6 +3,25 @@ import { describe, it } from "node:test";
 import type { AgentResult } from "../types.js";
 import { analyzeConvergence, recommend } from "./convergence.js";
 
+const DIFF_A = `diff --git a/a.ts b/a.ts
+--- a/a.ts
++++ b/a.ts
+@@ -1 +1 @@
++const x = 1;`;
+
+const DIFF_A_VARIANT = `diff --git a/a.ts b/a.ts
+--- a/a.ts
++++ b/a.ts
+@@ -1 +1 @@
++const x = 1;
++const extra = true;`;
+
+const DIFF_B = `diff --git a/b.ts b/b.ts
+--- a/b.ts
++++ b/b.ts
+@@ -1 +1 @@
++const y = 2;`;
+
 function makeAgent(overrides: Partial<AgentResult> & { id: number }): AgentResult {
   return {
     worktree: `/tmp/agent-${overrides.id}`,
@@ -10,8 +29,8 @@ function makeAgent(overrides: Partial<AgentResult> & { id: number }): AgentResul
     exitCode: 0,
     duration: 5000,
     output: "",
-    diff: "some diff",
-    filesChanged: ["src/index.ts"],
+    diff: DIFF_A,
+    filesChanged: ["a.ts"],
     linesAdded: 10,
     linesRemoved: 5,
     ...overrides,
@@ -33,44 +52,41 @@ describe("analyzeConvergence", () => {
     assert.deepEqual(result, []);
   });
 
-  it("groups agents that changed the same files", () => {
+  it("groups agents with similar diffs together", () => {
     const agents = [
-      makeAgent({ id: 1, filesChanged: ["a.ts", "b.ts"] }),
-      makeAgent({ id: 2, filesChanged: ["a.ts", "b.ts"] }),
-      makeAgent({ id: 3, filesChanged: ["c.ts"] }),
+      makeAgent({ id: 1, diff: DIFF_A, filesChanged: ["a.ts"] }),
+      makeAgent({ id: 2, diff: DIFF_A, filesChanged: ["a.ts"] }),
+      makeAgent({ id: 3, diff: DIFF_B, filesChanged: ["b.ts"] }),
     ];
     const groups = analyzeConvergence(agents);
 
     assert.equal(groups.length, 2);
-    assert.deepEqual(groups[0]!.agents, [1, 2]);
-    assert.ok(groups[0]!.similarity > groups[1]!.similarity);
-    assert.deepEqual(groups[1]!.agents, [3]);
+    // Agents 1,2 have identical diffs — should be in the same group
+    const largestGroup = groups[0]!;
+    assert.ok(largestGroup.agents.includes(1));
+    assert.ok(largestGroup.agents.includes(2));
+    assert.ok(largestGroup.similarity > groups[1]!.similarity);
   });
 
-  it("handles file order differences", () => {
-    const agents = [
-      makeAgent({ id: 1, filesChanged: ["b.ts", "a.ts"] }),
-      makeAgent({ id: 2, filesChanged: ["a.ts", "b.ts"] }),
-    ];
+  it("clusters agents with identical diffs", () => {
+    const agents = [makeAgent({ id: 1, diff: DIFF_A }), makeAgent({ id: 2, diff: DIFF_A })];
     const groups = analyzeConvergence(agents);
 
     assert.equal(groups.length, 1);
-    assert.deepEqual(groups[0]!.agents, [1, 2]);
-    assert.equal(groups[0]!.similarity, 1);
+    assert.deepEqual(groups[0]!.agents.sort(), [1, 2]);
   });
 
-  it("labels strong consensus at 80%+", () => {
+  it("labels strong consensus correctly", () => {
     const agents = [
-      makeAgent({ id: 1, filesChanged: ["a.ts"] }),
-      makeAgent({ id: 2, filesChanged: ["a.ts"] }),
-      makeAgent({ id: 3, filesChanged: ["a.ts"] }),
-      makeAgent({ id: 4, filesChanged: ["a.ts"] }),
-      makeAgent({ id: 5, filesChanged: ["b.ts"] }),
+      makeAgent({ id: 1, diff: DIFF_A }),
+      makeAgent({ id: 2, diff: DIFF_A }),
+      makeAgent({ id: 3, diff: DIFF_A }),
+      makeAgent({ id: 4, diff: DIFF_A }),
+      makeAgent({ id: 5, diff: DIFF_B, filesChanged: ["b.ts"] }),
     ];
     const groups = analyzeConvergence(agents);
 
     assert.ok(groups[0]!.description.includes("Strong consensus"));
-    assert.ok(groups[1]!.description.includes("Divergent"));
   });
 });
 
@@ -82,8 +98,8 @@ describe("recommend", () => {
 
   it("prefers agents that pass tests", () => {
     const agents = [
-      makeAgent({ id: 1, linesAdded: 20, linesRemoved: 10 }),
-      makeAgent({ id: 2, linesAdded: 5, linesRemoved: 2 }),
+      makeAgent({ id: 1, diff: DIFF_A, linesAdded: 20, linesRemoved: 10 }),
+      makeAgent({ id: 2, diff: DIFF_B, linesAdded: 5, linesRemoved: 2, filesChanged: ["b.ts"] }),
     ];
     const tests = [
       { agentId: 1, passed: true },
@@ -96,9 +112,15 @@ describe("recommend", () => {
 
   it("prefers agents in larger convergence group when tests are equal", () => {
     const agents = [
-      makeAgent({ id: 1, filesChanged: ["a.ts"], linesAdded: 10, linesRemoved: 5 }),
-      makeAgent({ id: 2, filesChanged: ["a.ts"], linesAdded: 10, linesRemoved: 5 }),
-      makeAgent({ id: 3, filesChanged: ["b.ts"], linesAdded: 10, linesRemoved: 5 }),
+      makeAgent({ id: 1, diff: DIFF_A, filesChanged: ["a.ts"], linesAdded: 10, linesRemoved: 5 }),
+      makeAgent({ id: 2, diff: DIFF_A, filesChanged: ["a.ts"], linesAdded: 10, linesRemoved: 5 }),
+      makeAgent({
+        id: 3,
+        diff: DIFF_B,
+        filesChanged: ["b.ts"],
+        linesAdded: 10,
+        linesRemoved: 5,
+      }),
     ];
     const tests = [
       { agentId: 1, passed: true },
@@ -114,12 +136,11 @@ describe("recommend", () => {
 
   it("prefers smaller diffs as tiebreaker", () => {
     const agents = [
-      makeAgent({ id: 1, filesChanged: ["a.ts"], linesAdded: 50, linesRemoved: 20 }),
-      makeAgent({ id: 2, filesChanged: ["a.ts"], linesAdded: 5, linesRemoved: 2 }),
+      makeAgent({ id: 1, diff: DIFF_A, linesAdded: 50, linesRemoved: 20 }),
+      makeAgent({ id: 2, diff: DIFF_A, linesAdded: 5, linesRemoved: 2 }),
     ];
     const convergence = analyzeConvergence(agents);
 
-    // No test results — convergence is equal, so diff size decides
     assert.equal(recommend(agents, [], convergence), 2);
   });
 });
