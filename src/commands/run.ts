@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getDefaultRunner, getRunner } from "../runners/registry.js";
-import { analyzeConvergence, recommend } from "../scoring/convergence.js";
+import { analyzeConvergence, copelandRecommend, recommend } from "../scoring/convergence.js";
 import { runTests, validateTestCommand } from "../scoring/test-runner.js";
 import type { AgentResult, EnsembleResult, RunOptions } from "../types.js";
 import { displayApplyInstructions, displayHeader, displayResults } from "../utils/display.js";
@@ -129,18 +129,23 @@ export async function run(opts: RunOptions): Promise<void> {
   const convergence = analyzeConvergence(agents, opts.threshold);
 
   // Phase 5: Recommendation
-  const { recommended, scores } = recommend(agents, testResults, convergence);
+  const { recommended: weightedRec, scores } = recommend(agents, testResults, convergence);
+  const copeland = copelandRecommend(agents, testResults, convergence);
+
+  const recommended = opts.scoring === "copeland" ? copeland.recommended : weightedRec;
 
   // Build result object
   const result: EnsembleResult = {
     prompt: opts.prompt,
     model: opts.model,
     timestamp: new Date().toISOString(),
+    scoring: opts.scoring,
     agents,
     tests: testResults,
     convergence,
     recommended,
     scores,
+    copelandScores: copeland.scores,
   };
 
   // Display results

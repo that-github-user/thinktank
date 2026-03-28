@@ -12,6 +12,7 @@ function makeOpts(overrides: Partial<RunOptions> = {}): RunOptions {
     model: "sonnet",
     threshold: 0.3,
     verbose: false,
+    scoring: "weighted",
     ...overrides,
   };
 }

@@ -8,6 +8,7 @@ export interface RunOptions {
   threshold: number;
   verbose: boolean;
   runner?: string;
+  scoring: "weighted" | "copeland";
 }
 
 export interface AgentResult {
@@ -46,13 +47,23 @@ export interface AgentScore {
   total: number;
 }
 
+export interface CopelandScore {
+  agentId: number;
+  testsWins: number;
+  convergenceWins: number;
+  filesChangedWins: number;
+  copelandTotal: number;
+}
+
 export interface EnsembleResult {
   prompt: string;
   model: string;
   timestamp: string;
+  scoring: "weighted" | "copeland";
   agents: AgentResult[];
   tests: TestResult[];
   convergence: ConvergenceGroup[];
   recommended: number | null;
   scores: AgentScore[];
+  copelandScores?: CopelandScore[];
 }

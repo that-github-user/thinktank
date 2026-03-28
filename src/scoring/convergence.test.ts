@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { AgentResult } from "../types.js";
-import { analyzeConvergence, recommend } from "./convergence.js";
+import { analyzeConvergence, copelandRecommend, recommend } from "./convergence.js";
 
 const DIFF_A = `diff --git a/a.ts b/a.ts
 --- a/a.ts
@@ -243,5 +243,148 @@ describe("recommend", () => {
     assert.ok(score1.diffSizePoints < score2.diffSizePoints);
     assert.equal(score2.diffSizePoints, 10);
     assert.ok(score1.diffSizePoints < 10);
+  });
+});
+
+describe("copelandRecommend", () => {
+  it("returns null for no completed agents", () => {
+    const agents = [makeAgent({ id: 1, status: "error", diff: "" })];
+    const result = copelandRecommend(agents, [], []);
+    assert.equal(result.recommended, null);
+    assert.deepEqual(result.scores, []);
+  });
+
+  it("recommends the agent that dominates all criteria", () => {
+    // Agent 1: passes tests, in larger convergence group, fewer files
+    // Agent 2: fails tests, alone, more files
+    const agents = [
+      makeAgent({ id: 1, diff: DIFF_A, filesChanged: ["a.ts"] }),
+      makeAgent({ id: 2, diff: DIFF_B, filesChanged: ["b.ts", "c.ts"] }),
+    ];
+    const tests = [
+      { agentId: 1, passed: true },
+      { agentId: 2, passed: false },
+    ];
+    const convergence = analyzeConvergence(agents);
+    const result = copelandRecommend(agents, tests, convergence);
+
+    assert.equal(result.recommended, 1);
+    const score1 = result.scores.find((s) => s.agentId === 1);
+    assert.ok(score1);
+    assert.equal(score1.copelandTotal, 1); // wins the one pairwise matchup
+    assert.ok(score1.testsWins > 0);
+  });
+
+  it("all agents identical gives zero Copeland scores", () => {
+    const agents = [
+      makeAgent({ id: 1, diff: DIFF_A, filesChanged: ["a.ts"] }),
+      makeAgent({ id: 2, diff: DIFF_A, filesChanged: ["a.ts"] }),
+      makeAgent({ id: 3, diff: DIFF_A, filesChanged: ["a.ts"] }),
+    ];
+    const tests = [
+      { agentId: 1, passed: true },
+      { agentId: 2, passed: true },
+      { agentId: 3, passed: true },
+    ];
+    const convergence = analyzeConvergence(agents);
+    const result = copelandRecommend(agents, tests, convergence);
+
+    // All agents tie on every criterion — all Copeland scores should be 0
+    for (const score of result.scores) {
+      assert.equal(score.copelandTotal, 0, `Agent #${score.agentId} should have Copeland score 0`);
+      assert.equal(score.testsWins, 0);
+      assert.equal(score.convergenceWins, 0);
+      assert.equal(score.filesChangedWins, 0);
+    }
+    // Still recommends someone (first agent)
+    assert.ok(result.recommended !== null);
+  });
+
+  it("handles agents with different strengths on different criteria (non-transitive)", () => {
+    // Agent 1: passes tests, many files, small group
+    // Agent 2: fails tests, few files, large group
+    // Agent 3: fails tests, many files, large group
+    const agents = [
+      makeAgent({ id: 1, diff: DIFF_A, filesChanged: ["a.ts", "b.ts", "c.ts"] }),
+      makeAgent({ id: 2, diff: DIFF_B, filesChanged: ["x.ts"] }),
+      makeAgent({ id: 3, diff: DIFF_B, filesChanged: ["x.ts", "y.ts", "z.ts"] }),
+    ];
+    const tests = [
+      { agentId: 1, passed: true },
+      { agentId: 2, passed: false },
+      { agentId: 3, passed: false },
+    ];
+    const convergence = analyzeConvergence(agents);
+    const result = copelandRecommend(agents, tests, convergence);
+
+    // Agent 1 vs Agent 2: tests(+1), convergence(-1), files(-1) → Agent 2 wins
+    // Agent 1 vs Agent 3: tests(+1), convergence(-1), files(tie) → tie
+    // Agent 2 vs Agent 3: tests(tie), convergence(tie), files(+1 for 2) → Agent 2 wins
+    // So Agent 2 should have the best Copeland score
+    assert.equal(result.recommended, 2);
+  });
+
+  it("prefers agent with test pass when other criteria are tied", () => {
+    const agents = [
+      makeAgent({ id: 1, diff: DIFF_A, filesChanged: ["a.ts"] }),
+      makeAgent({ id: 2, diff: DIFF_A, filesChanged: ["a.ts"] }),
+    ];
+    const tests = [
+      { agentId: 1, passed: true },
+      { agentId: 2, passed: false },
+    ];
+    const convergence = analyzeConvergence(agents);
+    const result = copelandRecommend(agents, tests, convergence);
+
+    assert.equal(result.recommended, 1);
+    const score1 = result.scores.find((s) => s.agentId === 1);
+    assert.ok(score1);
+    assert.equal(score1.testsWins, 1);
+    assert.equal(score1.copelandTotal, 1);
+  });
+
+  it("prefers fewer files changed when other criteria are equal", () => {
+    const agents = [
+      makeAgent({ id: 1, diff: DIFF_A, filesChanged: ["a.ts", "b.ts", "c.ts"] }),
+      makeAgent({ id: 2, diff: DIFF_A, filesChanged: ["a.ts"] }),
+    ];
+    const convergence = analyzeConvergence(agents);
+    const result = copelandRecommend(agents, [], convergence);
+
+    assert.equal(result.recommended, 2);
+  });
+
+  it("returns per-agent criterion breakdowns", () => {
+    const agents = [
+      makeAgent({ id: 1, diff: DIFF_A, filesChanged: ["a.ts"] }),
+      makeAgent({ id: 2, diff: DIFF_B, filesChanged: ["b.ts", "c.ts"] }),
+    ];
+    const tests = [
+      { agentId: 1, passed: true },
+      { agentId: 2, passed: false },
+    ];
+    const convergence = analyzeConvergence(agents);
+    const result = copelandRecommend(agents, tests, convergence);
+
+    assert.equal(result.scores.length, 2);
+    const score1 = result.scores.find((s) => s.agentId === 1);
+    const score2 = result.scores.find((s) => s.agentId === 2);
+    assert.ok(score1);
+    assert.ok(score2);
+
+    // Score1 wins tests and files, score2 wins neither
+    assert.equal(score1.testsWins, 1);
+    assert.equal(score2.testsWins, -1);
+    assert.equal(score1.filesChangedWins, 1);
+    assert.equal(score2.filesChangedWins, -1);
+  });
+
+  it("handles single agent", () => {
+    const agents = [makeAgent({ id: 1, diff: DIFF_A })];
+    const result = copelandRecommend(agents, [], []);
+
+    assert.equal(result.recommended, 1);
+    assert.equal(result.scores.length, 1);
+    assert.equal(result.scores[0]!.copelandTotal, 0);
   });
 });

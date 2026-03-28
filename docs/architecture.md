@@ -117,6 +117,26 @@ Normal-sized and thorough diffs all receive the full 10 points. Only outlier-lar
 
 The agent with the highest total score is recommended. Ties broken by the first agent.
 
+### Copeland Pairwise Scoring (alternative)
+
+Enabled with `--scoring copeland`. Instead of assigning absolute point values, Copeland scoring compares every pair of agents head-to-head on three criteria:
+
+| Criterion | Better = |
+|-----------|----------|
+| Tests passed | Passed > Failed |
+| Convergence group size | Larger group > Smaller group |
+| Files changed | Fewer files > More files |
+
+For each pair (A, B):
+1. Count how many criteria A wins vs B wins
+2. If A wins more criteria: A gets +1, B gets −1
+3. If B wins more criteria: B gets +1, A gets −1
+4. If tied on criteria count: both get 0
+
+The agent with the highest cumulative Copeland score is recommended.
+
+**When to use Copeland:** Copeland scoring avoids arbitrary point weights and is resistant to scale distortion. It works well when you want each criterion to have equal importance regardless of magnitude. However, it can produce more ties than weighted scoring, especially with few agents.
+
 ### Why these weights?
 - Tests (100) dominate because correctness trumps everything
 - Convergence (50) is secondary — agreement without tests is weaker evidence

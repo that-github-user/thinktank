@@ -98,11 +98,42 @@ export function displayResults(result: EnsembleResult): void {
     console.log();
   }
 
+  // Copeland scoring breakdown
+  if (result.copelandScores && result.copelandScores.length > 0) {
+    console.log(pc.bold("Copeland Pairwise Scoring"));
+    console.log(pc.dim("─".repeat(60)));
+    console.log(
+      "  " +
+        padRight("Agent", 8) +
+        padRight("Tests", 10) +
+        padRight("Converge", 10) +
+        padRight("Files", 10) +
+        padRight("Copeland", 10),
+    );
+    console.log("  " + pc.dim("─".repeat(48)));
+
+    for (const score of result.copelandScores) {
+      const isRecommended = result.scoring === "copeland" && result.recommended === score.agentId;
+      const prefix = isRecommended ? pc.cyan(">>") : "  ";
+      const fmt = (n: number): string => (n > 0 ? `+${n}` : String(n));
+      console.log(
+        prefix +
+          padRight(`#${score.agentId}`, 8) +
+          padRight(fmt(score.testsWins), 10) +
+          padRight(fmt(score.convergenceWins), 10) +
+          padRight(fmt(score.filesChangedWins), 10) +
+          padRight(fmt(score.copelandTotal), 10),
+      );
+    }
+    console.log();
+  }
+
   // Recommendation
   if (result.recommended !== null) {
+    const method = result.scoring === "copeland" ? "Copeland pairwise" : "weighted";
     console.log(
       pc.cyan(`  Recommended: Agent #${result.recommended}`) +
-        pc.dim(" (highest score based on tests + convergence + diff size)"),
+        pc.dim(` (${method} scoring: tests + convergence + diff size)`),
     );
     console.log();
   }
