@@ -24,6 +24,7 @@ program
   .option("-n, --attempts <number>", "Number of parallel attempts", "3")
   .option("-f, --file <path>", "Read prompt from a file (avoids shell expansion issues)")
   .option("-t, --test-cmd <command>", "Test command to verify results (e.g., 'npm test')")
+  .option("--test-timeout <seconds>", "Timeout for test command in seconds", "120")
   .option("--timeout <seconds>", "Timeout per agent in seconds", "300")
   .option("--model <model>", "Claude model to use", "sonnet")
   .option("-r, --runner <name>", "AI coding tool to use (default: claude-code)")
@@ -34,6 +35,12 @@ program
     const attempts = parseInt(opts.attempts, 10);
     if (Number.isNaN(attempts) || attempts < 1 || attempts > 20) {
       console.error("Error: --attempts must be a number between 1 and 20");
+      process.exit(1);
+    }
+
+    const testTimeout = parseInt(opts.testTimeout, 10);
+    if (Number.isNaN(testTimeout) || testTimeout < 10 || testTimeout > 600) {
+      console.error("Error: --test-timeout must be a number between 10 and 600 seconds");
       process.exit(1);
     }
 
@@ -54,6 +61,7 @@ program
       prompt,
       attempts,
       testCmd: opts.testCmd,
+      testTimeout,
       timeout,
       model: opts.model,
       runner: opts.runner,
