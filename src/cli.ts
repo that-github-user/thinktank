@@ -6,6 +6,7 @@ import { compare } from "./commands/compare.js";
 import { list } from "./commands/list.js";
 import { run } from "./commands/run.js";
 import { stats } from "./commands/stats.js";
+import { resolvePrompt } from "./utils/prompt.js";
 
 const program = new Command();
 
@@ -19,14 +20,17 @@ program
 program
   .command("run")
   .description("Run a task with N parallel AI coding agents")
-  .argument("<prompt>", "The coding task to perform")
+  .argument("[prompt]", "The coding task to perform")
   .option("-n, --attempts <number>", "Number of parallel attempts", "3")
+  .option("-f, --file <path>", "Read prompt from a file (avoids shell expansion issues)")
   .option("-t, --test-cmd <command>", "Test command to verify results (e.g., 'npm test')")
   .option("--timeout <seconds>", "Timeout per agent in seconds", "300")
   .option("--model <model>", "Claude model to use", "sonnet")
   .option("-r, --runner <name>", "AI coding tool to use (default: claude-code)")
   .option("--verbose", "Show detailed output from each agent")
-  .action(async (prompt: string, opts) => {
+  .action(async (promptArg: string | undefined, opts) => {
+    const prompt = resolvePrompt(promptArg, opts.file);
+
     const attempts = parseInt(opts.attempts, 10);
     if (Number.isNaN(attempts) || attempts < 1 || attempts > 20) {
       console.error("Error: --attempts must be a number between 1 and 20");
