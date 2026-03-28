@@ -2,6 +2,7 @@
 
 import { Command } from "commander";
 import { apply } from "./commands/apply.js";
+import { clean } from "./commands/clean.js";
 import { compare } from "./commands/compare.js";
 import { list } from "./commands/list.js";
 import { run } from "./commands/run.js";
@@ -96,6 +97,16 @@ program
   .description("List results from the most recent ensemble run")
   .action(async () => {
     await list();
+  });
+
+program
+  .command("clean")
+  .description("Remove thinktank worktrees, branches, and optionally run history")
+  .option("--all", "Also delete .thinktank/ run history")
+  .action(async (opts) => {
+    await clean({
+      all: opts.all ?? false,
+    });
   });
 
 program
