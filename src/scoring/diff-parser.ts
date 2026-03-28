@@ -30,6 +30,13 @@ export function parseDiff(diff: string): DiffFile[] {
 
     if (!current) continue;
 
+    // Skip binary file entries — git emits "Binary files a/x and b/x differ"
+    if (line.startsWith("Binary files ") && line.endsWith(" differ")) {
+      current = null;
+      files.pop();
+      continue;
+    }
+
     // Skip metadata lines
     if (line.startsWith("index ") || line.startsWith("---") || line.startsWith("+++")) {
       continue;
