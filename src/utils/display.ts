@@ -1,23 +1,9 @@
-import type { AgentResult, ConvergenceGroup, EnsembleResult, TestResult } from "../types.js";
-
-const COLORS = {
-  reset: "\x1b[0m",
-  bold: "\x1b[1m",
-  dim: "\x1b[2m",
-  green: "\x1b[32m",
-  red: "\x1b[31m",
-  yellow: "\x1b[33m",
-  blue: "\x1b[34m",
-  cyan: "\x1b[36m",
-};
-
-function c(color: keyof typeof COLORS, text: string): string {
-  return `${COLORS[color]}${text}${COLORS.reset}`;
-}
+import pc from "picocolors";
+import type { EnsembleResult } from "../types.js";
 
 export function displayHeader(prompt: string, attempts: number, model: string): void {
   console.log();
-  console.log(c("bold", "thinktank") + c("dim", " — ensemble AI coding"));
+  console.log(pc.bold("thinktank") + pc.dim(" — ensemble AI coding"));
   console.log();
   console.log(`  Task:     ${prompt}`);
   console.log(`  Agents:   ${attempts} parallel attempts`);
@@ -25,15 +11,10 @@ export function displayHeader(prompt: string, attempts: number, model: string): 
   console.log();
 }
 
-export function displayProgress(id: number, status: string): void {
-  const icon = status === "running" ? "..." : status === "done" ? "done" : "err";
-  process.stdout.write(`\r  Agent ${id}: ${icon}  `);
-}
-
 export function displayResults(result: EnsembleResult): void {
   console.log();
-  console.log(c("bold", "Results"));
-  console.log(c("dim", "─".repeat(60)));
+  console.log(pc.bold("Results"));
+  console.log(pc.dim("─".repeat(60)));
   console.log();
 
   // Agent summary table
@@ -46,21 +27,21 @@ export function displayResults(result: EnsembleResult): void {
       padRight("+/-", 12) +
       padRight("Time", 8),
   );
-  console.log("  " + c("dim", "─".repeat(54)));
+  console.log("  " + pc.dim("─".repeat(54)));
 
   for (const agent of result.agents) {
     const test = result.tests.find((t) => t.agentId === agent.id);
     const statusIcon =
       agent.status === "success"
-        ? c("green", "ok")
+        ? pc.green("ok")
         : agent.status === "timeout"
-          ? c("yellow", "timeout")
-          : c("red", "error");
+          ? pc.yellow("timeout")
+          : pc.red("error");
 
-    const testIcon = test ? (test.passed ? c("green", "pass") : c("red", "fail")) : c("dim", "n/a");
+    const testIcon = test ? (test.passed ? pc.green("pass") : pc.red("fail")) : pc.dim("n/a");
 
     const isRecommended = result.recommended === agent.id;
-    const prefix = isRecommended ? c("cyan", ">>") : "  ";
+    const prefix = isRecommended ? pc.cyan(">>") : "  ";
 
     console.log(
       prefix +
@@ -76,14 +57,14 @@ export function displayResults(result: EnsembleResult): void {
   // Convergence analysis
   if (result.convergence.length > 0) {
     console.log();
-    console.log(c("bold", "Convergence"));
-    console.log(c("dim", "─".repeat(60)));
+    console.log(pc.bold("Convergence"));
+    console.log(pc.dim("─".repeat(60)));
     for (const group of result.convergence) {
       const pct = Math.round(group.similarity * 100);
       const bar = "█".repeat(Math.round(pct / 5)) + "░".repeat(20 - Math.round(pct / 5));
       console.log(`  Agents [${group.agents.join(", ")}]: ${bar} ${pct}%`);
-      console.log(`  ${c("dim", group.description)}`);
-      console.log(`  ${c("dim", "Files: " + group.filesChanged.join(", "))}`);
+      console.log(`  ${pc.dim(group.description)}`);
+      console.log(`  ${pc.dim("Files: " + group.filesChanged.join(", "))}`);
       console.log();
     }
   }
@@ -91,8 +72,8 @@ export function displayResults(result: EnsembleResult): void {
   // Recommendation
   if (result.recommended !== null) {
     console.log(
-      c("cyan", `  Recommended: Agent #${result.recommended}`) +
-        c("dim", " (highest score based on tests + convergence + diff size)"),
+      pc.cyan(`  Recommended: Agent #${result.recommended}`) +
+        pc.dim(" (highest score based on tests + convergence + diff size)"),
     );
     console.log();
   }
@@ -101,20 +82,20 @@ export function displayResults(result: EnsembleResult): void {
 export function displayApplyInstructions(result: EnsembleResult): void {
   const completed = result.agents.filter((a) => a.status === "success" && a.diff.length > 0);
   if (completed.length === 0) {
-    console.log(c("red", "  No agents produced changes."));
+    console.log(pc.red("  No agents produced changes."));
     return;
   }
 
-  console.log(c("bold", "Next steps"));
-  console.log(c("dim", "─".repeat(60)));
+  console.log(pc.bold("Next steps"));
+  console.log(pc.dim("─".repeat(60)));
   console.log();
-  console.log("  To inspect a specific agent's changes:");
-  console.log(c("dim", `    cd <worktree-path> && git diff HEAD`));
+  console.log("  To apply the recommended result:");
+  console.log(pc.dim("    thinktank apply"));
   console.log();
-  console.log("  To apply the recommended agent's changes:");
-  console.log(c("dim", `    cd <repo-root> && git diff --no-index /dev/null <worktree>/...`));
+  console.log("  To apply a specific agent:");
+  console.log(pc.dim("    thinktank apply --agent N"));
   console.log();
-  console.log(c("dim", "  Worktrees will be cleaned up automatically on next run."));
+  console.log(pc.dim("  Worktrees will be cleaned up on next run or after apply."));
   console.log();
 }
 
