@@ -2,16 +2,71 @@
   <img src="assets/logo.png" alt="thinktank" width="200" />
 </p>
 
-# thinktank
+<h3 align="center">Ensemble AI coding — multiple agents, one best answer</h3>
 
-Ensemble AI coding. Run N parallel Claude Code agents on the same task, then select the best result via test execution and convergence analysis.
+<p align="center">
+  <a href="https://github.com/that-github-user/thinktank/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/that-github-user/thinktank/ci.yml?branch=main&style=for-the-badge&label=CI" alt="CI"></a>
+  <a href="https://github.com/that-github-user/thinktank/blob/main/LICENSE"><img src="https://img.shields.io/github/license/that-github-user/thinktank?style=for-the-badge" alt="License"></a>
+  <a href="https://github.com/that-github-user/thinktank/releases"><img src="https://img.shields.io/github/v/release/that-github-user/thinktank?style=for-the-badge&include_prereleases&label=version" alt="Version"></a>
+  <a href="https://github.com/that-github-user/thinktank/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=for-the-badge" alt="PRs Welcome"></a>
+</p>
 
-Based on the principle that **the aggregate of independent attempts outperforms any single attempt** — proven in [ensemble ML](https://en.wikipedia.org/wiki/Ensemble_learning), [superforecasting](https://en.wikipedia.org/wiki/Superforecasting), and [LLM code generation research](#references).
+<p align="center">
+  <a href="#quick-start">Quick Start</a> &middot;
+  <a href="#how-it-works">How It Works</a> &middot;
+  <a href="CONTRIBUTING.md">Contributing</a> &middot;
+  <a href="#references">References</a>
+</p>
+
+---
+
+Run N parallel Claude Code agents on the same task, then select the best result via test execution and convergence analysis. Based on the principle that **the aggregate of independent attempts outperforms any single attempt** — proven in [ensemble ML](https://en.wikipedia.org/wiki/Ensemble_learning), [superforecasting](https://en.wikipedia.org/wiki/Superforecasting), and [LLM code generation research](#references).
+
+## Quick start
+
+```bash
+npm install -g thinktank
+
+# Run 3 parallel agents on a task
+thinktank run "fix the authentication bypass"
+
+# Run 5 agents with test verification
+thinktank run "fix the race condition" -n 5 -t "npm test"
+
+# Apply the best result
+thinktank apply
+```
+
+Requires [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated.
 
 ## How it works
 
 ```
-thinktank run "fix the authentication bypass" -n 5 -t "npm test"
+                    ┌─────────────┐
+                    │  Your task  │
+                    └──────┬──────┘
+                           │
+              ┌────────────┼────────────┐
+              │            │            │
+              ▼            ▼            ▼
+        ┌──────────┐ ┌──────────┐ ┌──────────┐
+        │ Agent #1 │ │ Agent #2 │ │ Agent #3 │
+        │ worktree │ │ worktree │ │ worktree │
+        └────┬─────┘ └────┬─────┘ └────┬─────┘
+              │            │            │
+              ▼            ▼            ▼
+        ┌──────────────────────────────────────┐
+        │         Test & Convergence           │
+        │  ┌─────────┐  ┌──────────────────┐   │
+        │  │ npm test │  │ Agents 1,3 agree │   │
+        │  └─────────┘  └──────────────────┘   │
+        └───────────────────┬──────────────────┘
+                            │
+                            ▼
+                   ┌─────────────────┐
+                   │  Best result    │
+                   │  recommended    │
+                   └─────────────────┘
 ```
 
 1. Spawns **N parallel Claude Code agents**, each in an isolated git worktree
@@ -19,7 +74,7 @@ thinktank run "fix the authentication bypass" -n 5 -t "npm test"
 3. Runs your **test suite** on each result
 4. Analyzes **convergence** — did the agents agree on an approach?
 5. **Recommends** the best candidate (tests passing + consensus + smallest diff)
-6. You review and apply
+6. You review and `thinktank apply`
 
 ## Why this works
 
@@ -31,6 +86,8 @@ Every model ever benchmarked shows **pass@5 >> pass@1**. The gap between "one at
 | Confidence | "Did it get it right?" | "4/5 agents agree — high confidence" |
 | Coverage | One approach explored | Multiple approaches, pick the best |
 
+The key insight: **parallel attempts cost more tokens but not more time.** All agents run simultaneously.
+
 ## When to use it
 
 - **High-stakes changes** — auth, payments, security, data migrations
@@ -38,18 +95,10 @@ Every model ever benchmarked shows **pass@5 >> pass@1**. The gap between "one at
 - **Complex refactors** — many files, easy to miss something
 - **Unfamiliar codebases** — agents might go the wrong direction
 
-## Install
-
-```bash
-npm install -g thinktank
-```
-
-Requires [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated.
-
 ## Usage
 
 ```bash
-# Run 3 parallel agents (default)
+# Run with defaults (3 agents, sonnet model)
 thinktank run "add rate limiting to the API"
 
 # Run 5 agents with test verification
@@ -58,11 +107,17 @@ thinktank run "fix the race condition in the cache layer" -n 5 -t "npm test"
 # Use a specific model
 thinktank run "migrate callbacks to async/await" --model opus -n 3
 
+# Apply the recommended result
+thinktank apply
+
+# Apply a specific agent's result
+thinktank apply --agent 2
+
 # View the last run's results
 thinktank list
 ```
 
-## Output
+## Example output
 
 ```
 thinktank — ensemble AI coding
@@ -102,9 +157,7 @@ Convergence
 | Single Claude Code run | pass@1 | 1x | Fastest |
 | **thinktank (N=3)** | **~pass@3** | **3x** | **Same wall time** |
 | **thinktank (N=5)** | **~pass@5** | **5x** | **Same wall time** |
-| Manual retry loop | pass@k (sequential) | kx | k * slower |
-
-The key insight: **parallel attempts cost more tokens but not more time.** All agents run simultaneously.
+| Manual retry loop | pass@k (sequential) | kx | k × slower |
 
 ## References
 
@@ -121,7 +174,3 @@ The key insight: **parallel attempts cost more tokens but not more time.** All a
 ### Ensemble theory
 - *Superforecasting* — Tetlock & Gardner. The aggregate of independent forecasters consistently beats individuals.
 - *The Wisdom of Crowds* — Surowiecki. Independent estimates, when aggregated, converge on truth.
-
-## License
-
-MIT
