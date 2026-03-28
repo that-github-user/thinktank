@@ -125,9 +125,15 @@ program
 
 program
   .command("list")
-  .description("List results from the most recent ensemble run")
-  .action(async () => {
-    await list();
+  .description("List all past runs, or show details for a specific run")
+  .argument("[run-number]", "Run number to show details for")
+  .action(async (runNumberArg?: string) => {
+    const runNumber = runNumberArg ? parseInt(runNumberArg, 10) : undefined;
+    if (runNumberArg && (Number.isNaN(runNumber) || (runNumber as number) < 1)) {
+      console.error("Error: run number must be a positive integer");
+      process.exit(1);
+    }
+    await list(runNumber);
   });
 
 program
