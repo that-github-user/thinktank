@@ -9,7 +9,7 @@ import { pairwiseSimilarity } from "./diff-parser.js";
  * Agents are clustered by diff similarity using single-linkage clustering
  * with a 0.5 similarity threshold.
  */
-export function analyzeConvergence(agents: AgentResult[]): ConvergenceGroup[] {
+export function analyzeConvergence(agents: AgentResult[], threshold = 0.3): ConvergenceGroup[] {
   const completed = agents.filter((a) => a.status === "success" && a.diff.length > 0);
 
   if (completed.length === 0) return [];
@@ -18,11 +18,10 @@ export function analyzeConvergence(agents: AgentResult[]): ConvergenceGroup[] {
   const similarities = pairwiseSimilarity(completed.map((a) => ({ id: a.id, diff: a.diff })));
 
   // Single-linkage clustering: merge agents with similarity >= threshold
-  const SIMILARITY_THRESHOLD = 0.3;
   const clusters = clusterAgents(
     completed.map((a) => a.id),
     similarities,
-    SIMILARITY_THRESHOLD,
+    threshold,
   );
 
   // Convert clusters to convergence groups

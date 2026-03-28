@@ -5,6 +5,7 @@ export interface RunOptions {
   testTimeout: number;
   timeout: number;
   model: string;
+  threshold: number;
   verbose: boolean;
   runner?: string;
 }

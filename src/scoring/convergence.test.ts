@@ -76,6 +76,28 @@ describe("analyzeConvergence", () => {
     assert.deepEqual(groups[0]!.agents.sort(), [1, 2]);
   });
 
+  it("produces different clusters with different thresholds", () => {
+    // Agent 1 and 2 have similar (but not identical) diffs; agent 3 is different
+    const agents = [
+      makeAgent({ id: 1, diff: DIFF_A, filesChanged: ["a.ts"] }),
+      makeAgent({ id: 2, diff: DIFF_A_VARIANT, filesChanged: ["a.ts"] }),
+      makeAgent({ id: 3, diff: DIFF_B, filesChanged: ["b.ts"] }),
+    ];
+
+    // Low threshold: agents 1 and 2 cluster together (Jaccard similarity = 0.5 >= 0.3)
+    const lowGroups = analyzeConvergence(agents, 0.3);
+    const groupWith1And2 = lowGroups.find((g) => g.agents.includes(1) && g.agents.includes(2));
+    assert.ok(groupWith1And2, "At threshold 0.3, agents 1 and 2 should cluster together");
+
+    // Very high threshold: nothing clusters (similarity < 1.0 for non-identical diffs)
+    const highGroups = analyzeConvergence(agents, 1.0);
+    // Each agent should be in its own group since no pair has perfect similarity
+    assert.ok(
+      highGroups.length > lowGroups.length,
+      `Higher threshold should produce more groups (got ${highGroups.length} vs ${lowGroups.length})`,
+    );
+  });
+
   it("labels strong consensus correctly", () => {
     const agents = [
       makeAgent({ id: 1, diff: DIFF_A }),

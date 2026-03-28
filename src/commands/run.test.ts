@@ -10,6 +10,7 @@ function makeOpts(overrides: Partial<RunOptions> = {}): RunOptions {
     testTimeout: 120,
     timeout: 300,
     model: "sonnet",
+    threshold: 0.3,
     verbose: false,
     ...overrides,
   };
