@@ -1,6 +1,54 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { parseTestCommand, runTests } from "./test-runner.js";
+import { parseTestCommand, runTests, validateTestCommand } from "./test-runner.js";
+
+describe("validateTestCommand", () => {
+  it("accepts safe commands", () => {
+    assert.equal(validateTestCommand("npm test"), null);
+    assert.equal(validateTestCommand("npx jest --verbose"), null);
+    assert.equal(validateTestCommand("python -m pytest"), null);
+    assert.equal(validateTestCommand("go test ./..."), null);
+    assert.equal(validateTestCommand("cargo test"), null);
+    assert.equal(validateTestCommand("make test"), null);
+  });
+
+  it("rejects commands with semicolons", () => {
+    const err = validateTestCommand("npm test; rm -rf /");
+    assert.ok(err);
+    assert.ok(err.includes("shell operators"));
+  });
+
+  it("rejects commands with pipes", () => {
+    const err = validateTestCommand("npm test | grep fail");
+    assert.ok(err);
+  });
+
+  it("rejects commands with && chaining", () => {
+    const err = validateTestCommand("npm test && echo pwned");
+    assert.ok(err);
+  });
+
+  it("rejects commands with backticks", () => {
+    const err = validateTestCommand("npm test `whoami`");
+    assert.ok(err);
+  });
+
+  it("rejects commands with redirects", () => {
+    const err = validateTestCommand("npm test > /dev/null");
+    assert.ok(err);
+  });
+
+  it("rejects empty commands", () => {
+    const err = validateTestCommand("");
+    assert.ok(err);
+    assert.ok(err.includes("Empty"));
+  });
+
+  it("rejects whitespace-only commands", () => {
+    const err = validateTestCommand("   ");
+    assert.ok(err);
+  });
+});
 
 describe("parseTestCommand", () => {
   it("parses simple command", () => {
@@ -29,10 +77,16 @@ describe("parseTestCommand", () => {
 });
 
 describe("runTests", () => {
+  it("rejects shell injection attempts", async () => {
+    const result = await runTests(1, "npm test; rm -rf /", ".");
+    assert.equal(result.passed, false);
+    assert.ok(result.output.includes("shell operators"));
+  });
+
   it("returns failure for empty command", async () => {
     const result = await runTests(1, "", "/tmp");
     assert.equal(result.passed, false);
-    assert.equal(result.output, "Empty test command");
+    assert.ok(result.output.includes("Empty"));
   });
 
   it("returns failure for non-existent command", async () => {
@@ -42,13 +96,13 @@ describe("runTests", () => {
   });
 
   it("returns success for passing command", async () => {
-    const result = await runTests(1, "node -e process.exit(0)", ".");
+    const result = await runTests(1, "node --eval process.exit(0)", ".");
     assert.equal(result.passed, true);
     assert.equal(result.exitCode, 0);
   });
 
   it("returns failure for failing command", async () => {
-    const result = await runTests(1, "node -e process.exit(1)", ".");
+    const result = await runTests(1, "node --eval process.exit(1)", ".");
     assert.equal(result.passed, false);
     assert.ok(result.exitCode !== 0);
   });
