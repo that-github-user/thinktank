@@ -1,0 +1,25 @@
+{
+  "name": "thinktank",
+  "version": "0.1.0",
+  "description": "Ensemble AI coding — run N parallel Claude Code agents, select the best result via consensus + test execution",
+  "type": "module",
+  "bin": {
+    "thinktank": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "test": "node --test dist/**/*.test.js"
+  },
+  "keywords": ["ai", "coding", "ensemble", "claude", "claude-code", "consensus"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^14.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(ralph-loop:ralph-loop)",
+      "WebSearch",
+      "Bash(curl -s \"https://api.duckduckgo.com/?q=SWE-bench+alternatives+AI+coding+benchmark&format=json&no_html=1\")",
+      "Bash(curl -s \"https://api.duckduckgo.com/?q=Claude+Code+vs+Cursor+vs+Copilot+benchmark+comparison&format=json&no_html=1\")",
+      "Skill(ralph-loop:cancel-ralph)",
+      "Bash(npm --version)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx tsx:*)"
+    ]
+  }
+}
