@@ -55,3 +55,37 @@ describe("cleanupBranches", () => {
     // Should not throw
   });
 });
+
+describe("getDiff warning on failure", () => {
+  it("warns to stderr and returns empty string for invalid worktree path", async () => {
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => warnings.push(args.join(" "));
+    try {
+      const result = await getDiff("/nonexistent/path/thinktank-test");
+      assert.equal(result, "");
+      assert.equal(warnings.length, 1);
+      assert.ok(warnings[0].includes("getDiff failed"));
+      assert.ok(warnings[0].includes("/nonexistent/path/thinktank-test"));
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+});
+
+describe("getDiffStats warning on failure", () => {
+  it("warns to stderr and returns empty stats for invalid worktree path", async () => {
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => warnings.push(args.join(" "));
+    try {
+      const result = await getDiffStats("/nonexistent/path/thinktank-test");
+      assert.deepEqual(result, { filesChanged: [], linesAdded: 0, linesRemoved: 0 });
+      assert.equal(warnings.length, 1);
+      assert.ok(warnings[0].includes("getDiffStats failed"));
+      assert.ok(warnings[0].includes("/nonexistent/path/thinktank-test"));
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+});
