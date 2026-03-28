@@ -5,7 +5,7 @@ import { analyzeConvergence, recommend } from "../scoring/convergence.js";
 import { runTests } from "../scoring/test-runner.js";
 import type { AgentResult, EnsembleResult, RunOptions } from "../types.js";
 import { displayApplyInstructions, displayHeader, displayResults } from "../utils/display.js";
-import { cleanupBranches, createWorktree } from "../utils/git.js";
+import { cleanupBranches, createWorktree, removeWorktree } from "../utils/git.js";
 
 export async function run(opts: RunOptions): Promise<void> {
   displayHeader(opts.prompt, opts.attempts, opts.model);
@@ -32,6 +32,16 @@ export async function run(opts: RunOptions): Promise<void> {
   // Phase 1: Create worktrees
   console.log("  Creating worktrees...");
   const worktrees: Array<{ id: number; path: string }> = [];
+
+  // Graceful Ctrl+C: clean up all worktrees created so far, then exit.
+  // Registered before worktree creation so any interrupt is handled.
+  const handleSigint = () => {
+    console.log("\n\n  Interrupted — cleaning up worktrees...");
+    Promise.all(worktrees.map(({ path }) => removeWorktree(path).catch(() => {})))
+      .then(() => cleanupBranches().catch(() => {}))
+      .then(() => process.exit(130));
+  };
+  process.on("SIGINT", handleSigint);
 
   for (let i = 1; i <= opts.attempts; i++) {
     const path = await createWorktree(i);
@@ -105,6 +115,9 @@ export async function run(opts: RunOptions): Promise<void> {
 
   // Save result to .thinktank/
   await saveResult(result);
+
+  // Deregister SIGINT handler — run completed normally, no cleanup needed.
+  process.removeListener("SIGINT", handleSigint);
 
   // Note: we intentionally do NOT clean up worktrees here so the user
   // can inspect them. They get cleaned up on next run.
