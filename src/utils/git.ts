@@ -80,7 +80,9 @@ export async function getDiff(worktreePath: string): Promise<string> {
     // Exclude node_modules symlink (created by createWorktree for tool access)
     await exec("git", ["add", "-A"], { cwd: worktreePath });
     // Unstage node_modules symlink if it got picked up (created by createWorktree)
-    await exec("git", ["reset", "HEAD", "--", "node_modules"], { cwd: worktreePath }).catch(() => {});
+    await exec("git", ["reset", "HEAD", "--", "node_modules"], { cwd: worktreePath }).catch(
+      () => {},
+    );
     const { stdout } = await exec("git", ["diff", "--cached", "HEAD"], {
       cwd: worktreePath,
     });
@@ -99,7 +101,9 @@ export async function getDiffStats(
   try {
     await exec("git", ["add", "-A"], { cwd: worktreePath });
     // Unstage node_modules symlink if it got picked up (created by createWorktree)
-    await exec("git", ["reset", "HEAD", "--", "node_modules"], { cwd: worktreePath }).catch(() => {});
+    await exec("git", ["reset", "HEAD", "--", "node_modules"], { cwd: worktreePath }).catch(
+      () => {},
+    );
     const { stdout } = await exec("git", ["diff", "--cached", "--stat", "HEAD"], {
       cwd: worktreePath,
     });
