@@ -11,9 +11,32 @@ const exec = promisify(execFile);
 export interface ApplyOptions {
   agent?: number;
   preview?: boolean;
+  dryRun?: boolean;
+}
+
+export async function isWorkingTreeClean(): Promise<boolean> {
+  const repoRoot = await getRepoRoot();
+  const { stdout } = await exec("git", ["status", "--porcelain"], { cwd: repoRoot });
+  return stdout.trim() === "";
 }
 
 export async function apply(opts: ApplyOptions): Promise<void> {
+  // Check for clean working tree before applying
+  const isPreviewOnly = opts.preview || opts.dryRun;
+  if (!isPreviewOnly) {
+    const clean = await isWorkingTreeClean();
+    if (!clean) {
+      console.error("  Your working tree has uncommitted changes.");
+      console.error("  Please commit or stash them before running `thinktank apply`.");
+      console.error();
+      console.error("  Quick fix:");
+      console.error("    git stash        # stash changes temporarily");
+      console.error("    thinktank apply  # apply agent changes");
+      console.error("    git stash pop    # restore your changes");
+      process.exit(1);
+    }
+  }
+
   // Load latest result
   let result: EnsembleResult;
   try {
@@ -43,10 +66,11 @@ export async function apply(opts: ApplyOptions): Promise<void> {
     process.exit(1);
   }
 
-  // Preview mode: show diff and exit
-  if (opts.preview) {
+  // Preview / dry-run mode: show diff and exit
+  if (opts.preview || opts.dryRun) {
+    const label = opts.dryRun ? "Dry run" : "Preview";
     console.log();
-    console.log(pc.bold(`  Agent #${agentId} diff:`));
+    console.log(pc.bold(`  ${label} — Agent #${agentId} diff:`));
     console.log(pc.dim("  " + "─".repeat(58)));
     console.log();
     for (const line of agent.diff.split("\n")) {
