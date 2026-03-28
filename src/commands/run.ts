@@ -2,10 +2,33 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getDefaultRunner, getRunner } from "../runners/registry.js";
 import { analyzeConvergence, recommend } from "../scoring/convergence.js";
-import { runTests } from "../scoring/test-runner.js";
+import { runTests, validateTestCommand } from "../scoring/test-runner.js";
 import type { AgentResult, EnsembleResult, RunOptions } from "../types.js";
 import { displayApplyInstructions, displayHeader, displayResults } from "../utils/display.js";
-import { cleanupBranches, createWorktree, removeWorktree } from "../utils/git.js";
+import { cleanupBranches, createWorktree, getRepoRoot, removeWorktree } from "../utils/git.js";
+
+/**
+ * Pre-flight validation before spawning agents.
+ * Returns an error message if validation fails, or null if everything is OK.
+ */
+export async function preflightValidation(opts: RunOptions): Promise<string | null> {
+  // Check: current directory is a git repo with an accessible working tree
+  try {
+    await getRepoRoot();
+  } catch {
+    return "Not a git repository. Run this command from inside a git repo.";
+  }
+
+  // Check: test command is valid (if specified)
+  if (opts.testCmd) {
+    const testError = validateTestCommand(opts.testCmd);
+    if (testError) {
+      return `Invalid --test-cmd: ${testError}`;
+    }
+  }
+
+  return null;
+}
 
 export async function run(opts: RunOptions): Promise<void> {
   displayHeader(opts.prompt, opts.attempts, opts.model);
@@ -23,6 +46,13 @@ export async function run(opts: RunOptions): Promise<void> {
     console.error(
       `  Runner "${runner.name}" is not available. Is ${runner.description} installed?`,
     );
+    process.exit(1);
+  }
+
+  // Pre-flight validation
+  const preflightError = await preflightValidation(opts);
+  if (preflightError) {
+    console.error(`  ${preflightError}`);
     process.exit(1);
   }
 
