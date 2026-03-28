@@ -110,7 +110,7 @@ describe("runTests", () => {
 
   it("respects custom timeout parameter", async () => {
     // Use a very short timeout (100ms) with a command that sleeps longer
-    const result = await runTests(1, "node -e process.stdin.resume()", ".", 100);
+    const result = await runTests(1, "node --interactive", ".", 100);
     assert.equal(result.passed, false);
     assert.equal(result.exitCode, 124);
     assert.ok(result.output.includes("timed out after 0.1s"));
