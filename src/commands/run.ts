@@ -153,8 +153,12 @@ export async function run(opts: RunOptions): Promise<void> {
   };
 
   // Display results
-  displayResults(result);
-  displayApplyInstructions(result);
+  if (opts.outputFormat === "json") {
+    console.log(JSON.stringify(result));
+  } else {
+    displayResults(result);
+    displayApplyInstructions(result);
+  }
 
   // Save result to .thinktank/
   await saveResult(result);

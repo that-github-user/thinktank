@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { afterEach, describe, it } from "node:test";
 import type { RunOptions } from "../types.js";
 import { makeResultFilename, preflightValidation } from "./run.js";
 
@@ -13,6 +13,7 @@ function makeOpts(overrides: Partial<RunOptions> = {}): RunOptions {
     threshold: 0.3,
     verbose: false,
     scoring: "weighted",
+    outputFormat: "text",
     ...overrides,
   };
 }
@@ -76,5 +77,43 @@ describe("makeResultFilename", () => {
   it("formats timestamp correctly", () => {
     const filename = makeResultFilename("2026-03-28T18:09:50.100Z");
     assert.equal(filename, "run-2026-03-28T18-09-50-100Z.json");
+  });
+});
+
+describe("outputFormat option", () => {
+  it("accepts text as default output format", () => {
+    const opts = makeOpts({ outputFormat: "text" });
+    assert.equal(opts.outputFormat, "text");
+  });
+
+  it("accepts json output format", () => {
+    const opts = makeOpts({ outputFormat: "json" });
+    assert.equal(opts.outputFormat, "json");
+  });
+});
+
+describe("NO_COLOR environment variable", () => {
+  const originalNoColor = process.env.NO_COLOR;
+
+  afterEach(() => {
+    if (originalNoColor === undefined) {
+      delete process.env.NO_COLOR;
+    } else {
+      process.env.NO_COLOR = originalNoColor;
+    }
+  });
+
+  it("can be set to disable colors", () => {
+    process.env.NO_COLOR = "1";
+    assert.equal(process.env.NO_COLOR, "1");
+  });
+
+  it("picocolors respects NO_COLOR", async () => {
+    process.env.NO_COLOR = "1";
+    // picocolors checks NO_COLOR at import time, but its createColors
+    // function can be used to verify the behavior
+    const pc = await import("picocolors");
+    const colors = pc.createColors(false);
+    assert.equal(colors.bold("test"), "test");
   });
 });

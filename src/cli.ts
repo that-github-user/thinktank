@@ -45,6 +45,8 @@ program
     String(cfg.threshold),
   )
   .option("--scoring <method>", "Scoring method: copeland (default) or weighted", "copeland")
+  .option("--no-color", "Disable colored output")
+  .option("--output-format <format>", "Output format: text (default) or json", "text")
   .option("--verbose", "Show detailed output from each agent")
   .action(async (promptArg: string | undefined, opts) => {
     const prompt = resolvePrompt(promptArg, opts.file);
@@ -79,6 +81,17 @@ program
       process.exit(1);
     }
 
+    // --no-color: commander parses --no-color as opts.color === false
+    if (opts.color === false) {
+      process.env.NO_COLOR = "1";
+    }
+
+    const validFormats = ["text", "json"];
+    if (!validFormats.includes(opts.outputFormat)) {
+      console.error(`Error: --output-format must be one of: ${validFormats.join(", ")}`);
+      process.exit(1);
+    }
+
     const knownModels = ["sonnet", "opus", "haiku"];
     if (!knownModels.includes(opts.model) && !opts.model.startsWith("claude-")) {
       console.warn(
@@ -97,6 +110,7 @@ program
       runner: opts.runner,
       scoring: opts.scoring,
       verbose: opts.verbose ?? false,
+      outputFormat: opts.outputFormat,
     });
   });
 
