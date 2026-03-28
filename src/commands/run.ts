@@ -132,12 +132,21 @@ export async function retry(opts: RunOptions): Promise<void> {
   };
   process.on("SIGINT", handleSigint);
 
-  const worktreeResults = await Promise.all(
-    failedIds.map((id) => createWorktree(id).then((path) => ({ id, path }))),
-  );
-  for (const wt of worktreeResults) {
-    worktrees.push(wt);
-    console.log(`    Agent #${wt.id}: ${wt.path}`);
+  try {
+    const worktreeResults = await Promise.all(
+      failedIds.map((id) => createWorktree(id).then((path) => ({ id, path }))),
+    );
+    for (const wt of worktreeResults) {
+      worktrees.push(wt);
+      console.log(`    Agent #${wt.id}: ${wt.path}`);
+    }
+  } catch (err) {
+    // Clean up any worktrees that were created before the failure
+    console.error("  Failed to create worktrees — cleaning up...");
+    await Promise.all(worktrees.map(({ path }) => removeWorktree(path).catch(() => {})));
+    await cleanupBranches().catch(() => {});
+    process.removeListener("SIGINT", handleSigint);
+    throw err;
   }
   console.log();
 
@@ -169,8 +178,10 @@ export async function retry(opts: RunOptions): Promise<void> {
   // Phase 3: Merge retried agents back into original results
   const mergedAgents = mergeRetryResults(previous, retriedAgents);
 
-  // Phase 4: Run tests on ALL agents (retried get fresh tests, keep old test results for others)
-  let testResults = [...previous.tests];
+  // Phase 4: Run tests — always discard stale test results for retried agents,
+  // since they now have different code regardless of whether --test-cmd is provided.
+  const retriedIdSet = new Set(failedIds);
+  const testResults = previous.tests.filter((t) => !retriedIdSet.has(t.agentId));
 
   if (opts.testCmd) {
     console.log(`  Running tests: ${opts.testCmd}`);
@@ -181,10 +192,6 @@ export async function retry(opts: RunOptions): Promise<void> {
       runTests(id, opts.testCmd!, path, testTimeoutMs),
     );
     const retryTestResults = await Promise.all(retryTestPromises);
-
-    // Replace test results for retried agents
-    const retriedIds = new Set(failedIds);
-    testResults = testResults.filter((t) => !retriedIds.has(t.agentId));
     testResults.push(...retryTestResults);
 
     for (const test of retryTestResults) {
@@ -274,14 +281,22 @@ export async function run(opts: RunOptions): Promise<void> {
   };
   process.on("SIGINT", handleSigint);
 
-  const worktreeResults = await Promise.all(
-    Array.from({ length: opts.attempts }, (_, i) =>
-      createWorktree(i + 1).then((path) => ({ id: i + 1, path })),
-    ),
-  );
-  for (const wt of worktreeResults) {
-    worktrees.push(wt);
-    console.log(`    Agent #${wt.id}: ${wt.path}`);
+  try {
+    const worktreeResults = await Promise.all(
+      Array.from({ length: opts.attempts }, (_, i) =>
+        createWorktree(i + 1).then((path) => ({ id: i + 1, path })),
+      ),
+    );
+    for (const wt of worktreeResults) {
+      worktrees.push(wt);
+      console.log(`    Agent #${wt.id}: ${wt.path}`);
+    }
+  } catch (err) {
+    console.error("  Failed to create worktrees — cleaning up...");
+    await Promise.all(worktrees.map(({ path }) => removeWorktree(path).catch(() => {})));
+    await cleanupBranches().catch(() => {});
+    process.removeListener("SIGINT", handleSigint);
+    throw err;
   }
   console.log();
 

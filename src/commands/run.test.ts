@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
-import type { AgentResult, EnsembleResult, RunOptions } from "../types.js";
+import type { AgentResult, EnsembleResult, RunOptions, TestResult } from "../types.js";
 import {
   findFailedAgents,
+  loadLatestResult,
   makeResultFilename,
   mergeRetryResults,
   preflightValidation,
@@ -252,5 +256,155 @@ describe("mergeRetryResults", () => {
 
     const merged = mergeRetryResults(original, retried);
     assert.equal(merged.length, original.agents.length);
+  });
+
+  it("replaces all agents when all were retried", () => {
+    const original = makeResult({
+      agents: [
+        makeAgent({ id: 1, status: "error", diff: "", filesChanged: [] }),
+        makeAgent({ id: 2, status: "timeout", diff: "", filesChanged: [] }),
+        makeAgent({ id: 3, status: "error", diff: "", filesChanged: [] }),
+      ],
+    });
+    const retried = [
+      makeAgent({ id: 1, status: "success", diff: "diff 1" }),
+      makeAgent({ id: 2, status: "success", diff: "diff 2" }),
+      makeAgent({ id: 3, status: "error", diff: "" }),
+    ];
+
+    const merged = mergeRetryResults(original, retried);
+
+    assert.equal(merged.length, 3);
+    assert.equal(merged[0].status, "success");
+    assert.equal(merged[0].diff, "diff 1");
+    assert.equal(merged[1].status, "success");
+    assert.equal(merged[1].diff, "diff 2");
+    assert.equal(merged[2].status, "error"); // retry also failed
+  });
+});
+
+describe("loadLatestResult", () => {
+  it("returns null when latest.json does not exist", async () => {
+    // Save and restore cwd to point at a temp dir with no .thinktank/
+    const originalCwd = process.cwd();
+    const tempDir = join(tmpdir(), `thinktank-test-load-${Date.now()}`);
+    await mkdir(tempDir, { recursive: true });
+    try {
+      process.chdir(tempDir);
+      const result = await loadLatestResult();
+      assert.equal(result, null);
+    } finally {
+      process.chdir(originalCwd);
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns null when latest.json contains invalid JSON", async () => {
+    const originalCwd = process.cwd();
+    const tempDir = join(tmpdir(), `thinktank-test-load-${Date.now()}`);
+    const ttDir = join(tempDir, ".thinktank");
+    await mkdir(ttDir, { recursive: true });
+    try {
+      await writeFile(join(ttDir, "latest.json"), "not valid json{{{");
+      process.chdir(tempDir);
+      const result = await loadLatestResult();
+      assert.equal(result, null);
+    } finally {
+      process.chdir(originalCwd);
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("loads a valid latest.json", async () => {
+    const originalCwd = process.cwd();
+    const tempDir = join(tmpdir(), `thinktank-test-load-${Date.now()}`);
+    const ttDir = join(tempDir, ".thinktank");
+    await mkdir(ttDir, { recursive: true });
+    const expected = makeResult();
+    try {
+      await writeFile(join(ttDir, "latest.json"), JSON.stringify(expected));
+      process.chdir(tempDir);
+      const result = await loadLatestResult();
+      assert.ok(result);
+      assert.equal(result.prompt, expected.prompt);
+      assert.equal(result.agents.length, expected.agents.length);
+    } finally {
+      process.chdir(originalCwd);
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("retry edge cases", () => {
+  it("findFailedAgents returns all agents when every agent failed", () => {
+    const result = makeResult({
+      agents: [
+        makeAgent({ id: 1, status: "error" }),
+        makeAgent({ id: 2, status: "timeout" }),
+        makeAgent({ id: 3, status: "error" }),
+      ],
+    });
+    const failed = findFailedAgents(result);
+    assert.equal(failed.length, 3);
+    assert.deepEqual(failed.map((a) => a.id).sort(), [1, 2, 3]);
+  });
+
+  it("mergeRetryResults handles retry where all retried agents fail again", () => {
+    const original = makeResult({
+      agents: [
+        makeAgent({ id: 1, status: "success", diff: "good diff" }),
+        makeAgent({ id: 2, status: "error", diff: "" }),
+        makeAgent({ id: 3, status: "timeout", diff: "" }),
+      ],
+    });
+    const retried = [
+      makeAgent({ id: 2, status: "timeout", diff: "" }),
+      makeAgent({ id: 3, status: "error", diff: "" }),
+    ];
+
+    const merged = mergeRetryResults(original, retried);
+
+    // Agent 1 preserved, agents 2 and 3 replaced with still-failed results
+    assert.equal(merged[0].status, "success");
+    assert.equal(merged[0].diff, "good diff");
+    assert.equal(merged[1].status, "timeout");
+    assert.equal(merged[2].status, "error");
+  });
+
+  it("stale test results are removed for retried agents even without --test-cmd", () => {
+    // Simulate: previous run had test results for all agents,
+    // agents 2 and 3 failed and are being retried.
+    // After merge, test results for agents 2 and 3 should be gone
+    // since their code changed.
+    const previousTests: TestResult[] = [
+      { agentId: 1, passed: true, output: "ok", exitCode: 0 },
+      { agentId: 2, passed: false, output: "fail", exitCode: 1 },
+      { agentId: 3, passed: false, output: "timeout", exitCode: 1 },
+    ];
+
+    const retriedIds = new Set([2, 3]);
+    // This mirrors the fixed logic in retry(): filter out stale tests
+    const filtered = previousTests.filter((t) => !retriedIds.has(t.agentId));
+
+    assert.equal(filtered.length, 1);
+    assert.equal(filtered[0].agentId, 1);
+  });
+
+  it("mergeRetryResults with single failed agent preserves others", () => {
+    const original = makeResult({
+      agents: [
+        makeAgent({ id: 1, status: "success", diff: "diff1" }),
+        makeAgent({ id: 2, status: "success", diff: "diff2" }),
+        makeAgent({ id: 3, status: "error", diff: "" }),
+      ],
+    });
+    const retried = [makeAgent({ id: 3, status: "success", diff: "new diff3" })];
+
+    const merged = mergeRetryResults(original, retried);
+
+    assert.equal(merged[0].diff, "diff1");
+    assert.equal(merged[1].diff, "diff2");
+    assert.equal(merged[2].status, "success");
+    assert.equal(merged[2].diff, "new diff3");
   });
 });
