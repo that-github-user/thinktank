@@ -8,7 +8,7 @@ export async function runClaudeAgent(
   worktreePath: string,
   model: string,
   timeout: number,
-  verbose: boolean
+  verbose: boolean,
 ): Promise<AgentResult> {
   const start = Date.now();
 

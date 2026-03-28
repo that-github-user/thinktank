@@ -1,4 +1,4 @@
-import type { AgentResult, TestResult, ConvergenceGroup, EnsembleResult } from "../types.js";
+import type { AgentResult, ConvergenceGroup, EnsembleResult, TestResult } from "../types.js";
 
 const COLORS = {
   reset: "\x1b[0m",
@@ -44,7 +44,7 @@ export function displayResults(result: EnsembleResult): void {
       padRight("Tests", 8) +
       padRight("Files", 8) +
       padRight("+/-", 12) +
-      padRight("Time", 8)
+      padRight("Time", 8),
   );
   console.log("  " + c("dim", "─".repeat(54)));
 
@@ -57,11 +57,7 @@ export function displayResults(result: EnsembleResult): void {
           ? c("yellow", "timeout")
           : c("red", "error");
 
-    const testIcon = test
-      ? test.passed
-        ? c("green", "pass")
-        : c("red", "fail")
-      : c("dim", "n/a");
+    const testIcon = test ? (test.passed ? c("green", "pass") : c("red", "fail")) : c("dim", "n/a");
 
     const isRecommended = result.recommended === agent.id;
     const prefix = isRecommended ? c("cyan", ">>") : "  ";
@@ -73,7 +69,7 @@ export function displayResults(result: EnsembleResult): void {
         padRight(testIcon, 8) +
         padRight(String(agent.filesChanged.length), 8) +
         padRight(`+${agent.linesAdded}/-${agent.linesRemoved}`, 12) +
-        padRight(formatDuration(agent.duration), 8)
+        padRight(formatDuration(agent.duration), 8),
     );
   }
 
@@ -85,9 +81,7 @@ export function displayResults(result: EnsembleResult): void {
     for (const group of result.convergence) {
       const pct = Math.round(group.similarity * 100);
       const bar = "█".repeat(Math.round(pct / 5)) + "░".repeat(20 - Math.round(pct / 5));
-      console.log(
-        `  Agents [${group.agents.join(", ")}]: ${bar} ${pct}%`
-      );
+      console.log(`  Agents [${group.agents.join(", ")}]: ${bar} ${pct}%`);
       console.log(`  ${c("dim", group.description)}`);
       console.log(`  ${c("dim", "Files: " + group.filesChanged.join(", "))}`);
       console.log();
@@ -98,16 +92,14 @@ export function displayResults(result: EnsembleResult): void {
   if (result.recommended !== null) {
     console.log(
       c("cyan", `  Recommended: Agent #${result.recommended}`) +
-        c("dim", " (highest score based on tests + convergence + diff size)")
+        c("dim", " (highest score based on tests + convergence + diff size)"),
     );
     console.log();
   }
 }
 
 export function displayApplyInstructions(result: EnsembleResult): void {
-  const completed = result.agents.filter(
-    (a) => a.status === "success" && a.diff.length > 0
-  );
+  const completed = result.agents.filter((a) => a.status === "success" && a.diff.length > 0);
   if (completed.length === 0) {
     console.log(c("red", "  No agents produced changes."));
     return;
@@ -120,18 +112,15 @@ export function displayApplyInstructions(result: EnsembleResult): void {
   console.log(c("dim", `    cd <worktree-path> && git diff HEAD`));
   console.log();
   console.log("  To apply the recommended agent's changes:");
-  console.log(
-    c("dim", `    cd <repo-root> && git diff --no-index /dev/null <worktree>/...`)
-  );
+  console.log(c("dim", `    cd <repo-root> && git diff --no-index /dev/null <worktree>/...`));
   console.log();
-  console.log(
-    c("dim", "  Worktrees will be cleaned up automatically on next run.")
-  );
+  console.log(c("dim", "  Worktrees will be cleaned up automatically on next run."));
   console.log();
 }
 
 function padRight(str: string, len: number): string {
   // Strip ANSI codes for length calculation
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional ANSI escape sequence matching
   const stripped = str.replace(/\x1b\[[0-9;]*m/g, "");
   const padding = Math.max(0, len - stripped.length);
   return str + " ".repeat(padding);

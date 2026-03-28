@@ -7,7 +7,7 @@ const exec = promisify(execFile);
 export async function runTests(
   agentId: number,
   testCmd: string,
-  worktreePath: string
+  worktreePath: string,
 ): Promise<TestResult> {
   const parts = testCmd.split(" ");
   const cmd = parts[0]!;

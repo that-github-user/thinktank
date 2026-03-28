@@ -1,7 +1,7 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { analyzeConvergence, recommend } from "./convergence.js";
+import { describe, it } from "node:test";
 import type { AgentResult } from "../types.js";
+import { analyzeConvergence, recommend } from "./convergence.js";
 
 function makeAgent(overrides: Partial<AgentResult> & { id: number }): AgentResult {
   return {

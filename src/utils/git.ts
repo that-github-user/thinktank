@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 
 const exec = promisify(execFile);
 
@@ -56,7 +56,7 @@ export async function getDiff(worktreePath: string): Promise<string> {
 }
 
 export async function getDiffStats(
-  worktreePath: string
+  worktreePath: string,
 ): Promise<{ filesChanged: string[]; linesAdded: number; linesRemoved: number }> {
   try {
     await exec("git", ["add", "-A"], { cwd: worktreePath });
@@ -85,10 +85,7 @@ export async function getDiffStats(
   }
 }
 
-export async function applyDiff(
-  diff: string,
-  targetDir: string
-): Promise<void> {
+export async function applyDiff(diff: string, targetDir: string): Promise<void> {
   const { execFile: execFileCb } = await import("node:child_process");
   const child = execFileCb("git", ["apply", "--3way", "-"], {
     cwd: targetDir,

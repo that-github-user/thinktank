@@ -1,15 +1,11 @@
-import type { RunOptions, AgentResult, EnsembleResult } from "../types.js";
-import { createWorktree, removeWorktree, cleanupBranches } from "../utils/git.js";
-import { runClaudeAgent } from "../runners/claude-code.js";
-import { runTests } from "../scoring/test-runner.js";
-import { analyzeConvergence, recommend } from "../scoring/convergence.js";
-import {
-  displayHeader,
-  displayResults,
-  displayApplyInstructions,
-} from "../utils/display.js";
-import { writeFile, mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { runClaudeAgent } from "../runners/claude-code.js";
+import { analyzeConvergence, recommend } from "../scoring/convergence.js";
+import { runTests } from "../scoring/test-runner.js";
+import type { AgentResult, EnsembleResult, RunOptions } from "../types.js";
+import { displayApplyInstructions, displayHeader, displayResults } from "../utils/display.js";
+import { cleanupBranches, createWorktree, removeWorktree } from "../utils/git.js";
 
 export async function run(opts: RunOptions): Promise<void> {
   displayHeader(opts.prompt, opts.attempts, opts.model);
@@ -33,7 +29,7 @@ export async function run(opts: RunOptions): Promise<void> {
   console.log();
 
   const agentPromises = worktrees.map(({ id, path }) =>
-    runClaudeAgent(id, opts.prompt, path, opts.model, opts.timeout, opts.verbose)
+    runClaudeAgent(id, opts.prompt, path, opts.model, opts.timeout, opts.verbose),
   );
 
   const agents: AgentResult[] = await Promise.all(agentPromises);
@@ -43,19 +39,18 @@ export async function run(opts: RunOptions): Promise<void> {
     const icon = agent.status === "success" ? "✓" : agent.status === "timeout" ? "⏱" : "✗";
     const files = agent.filesChanged.length;
     console.log(
-      `    Agent #${agent.id}: ${icon} ${agent.status} — ${files} files changed in ${Math.round(agent.duration / 1000)}s`
+      `    Agent #${agent.id}: ${icon} ${agent.status} — ${files} files changed in ${Math.round(agent.duration / 1000)}s`,
     );
   }
   console.log();
 
   // Phase 3: Run tests (if test command provided)
-  let testResults: Array<{ agentId: number; passed: boolean; output: string; exitCode: number }> = [];
+  let testResults: Array<{ agentId: number; passed: boolean; output: string; exitCode: number }> =
+    [];
 
   if (opts.testCmd) {
     console.log(`  Running tests: ${opts.testCmd}`);
-    const testPromises = worktrees.map(({ id, path }) =>
-      runTests(id, opts.testCmd!, path)
-    );
+    const testPromises = worktrees.map(({ id, path }) => runTests(id, opts.testCmd!, path));
     testResults = await Promise.all(testPromises);
 
     for (const test of testResults) {
@@ -99,16 +94,10 @@ async function saveResult(result: EnsembleResult): Promise<void> {
 
   // Save full result
   const filename = `run-${result.timestamp.replace(/[:.]/g, "-")}.json`;
-  await writeFile(
-    join(dir, filename),
-    JSON.stringify(result, null, 2)
-  );
+  await writeFile(join(dir, filename), JSON.stringify(result, null, 2));
 
   // Save as latest
-  await writeFile(
-    join(dir, "latest.json"),
-    JSON.stringify(result, null, 2)
-  );
+  await writeFile(join(dir, "latest.json"), JSON.stringify(result, null, 2));
 
   console.log(`  Results saved to ${join(dir, filename)}`);
   console.log();
