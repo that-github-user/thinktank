@@ -1,4 +1,4 @@
-import type { AgentResult, ConvergenceGroup } from "../types.js";
+import type { AgentResult, AgentScore, ConvergenceGroup } from "../types.js";
 import { pairwiseSimilarity } from "./diff-parser.js";
 
 /**
@@ -127,39 +127,45 @@ export function recommend(
   agents: AgentResult[],
   testResults: Array<{ agentId: number; passed: boolean }>,
   convergence: ConvergenceGroup[],
-): number | null {
+): { recommended: number | null; scores: AgentScore[] } {
   const completed = agents.filter((a) => a.status === "success" && a.diff.length > 0);
-  if (completed.length === 0) return null;
+  if (completed.length === 0) return { recommended: null, scores: [] };
 
-  const scores = new Map<number, number>();
+  const agentScores: AgentScore[] = [];
 
   for (const agent of completed) {
-    let score = 0;
-
     // Tests passing is the strongest signal
     const test = testResults.find((t) => t.agentId === agent.id);
-    if (test?.passed) score += 100;
+    const testPoints = test?.passed ? 100 : 0;
 
     // Being in the largest convergence group
     const group = convergence.find((g) => g.agents.includes(agent.id));
-    if (group) score += group.similarity * 50;
+    const convergencePoints = group ? group.similarity * 50 : 0;
 
     // Smaller diffs preferred (normalized)
     const maxLines = Math.max(...completed.map((a) => a.linesAdded + a.linesRemoved), 1);
     const agentLines = agent.linesAdded + agent.linesRemoved;
-    score += (1 - agentLines / maxLines) * 10;
+    const diffSizePoints = (1 - agentLines / maxLines) * 10;
 
-    scores.set(agent.id, score);
+    const total = testPoints + convergencePoints + diffSizePoints;
+
+    agentScores.push({
+      agentId: agent.id,
+      testPoints,
+      convergencePoints: Math.round(convergencePoints * 100) / 100,
+      diffSizePoints: Math.round(diffSizePoints * 100) / 100,
+      total: Math.round(total * 100) / 100,
+    });
   }
 
   let bestId: number | null = null;
   let bestScore = -1;
-  for (const [id, score] of scores) {
-    if (score > bestScore) {
-      bestScore = score;
-      bestId = id;
+  for (const score of agentScores) {
+    if (score.total > bestScore) {
+      bestScore = score.total;
+      bestId = score.agentId;
     }
   }
 
-  return bestId;
+  return { recommended: bestId, scores: agentScores };
 }

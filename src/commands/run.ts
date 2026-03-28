@@ -129,7 +129,7 @@ export async function run(opts: RunOptions): Promise<void> {
   const convergence = analyzeConvergence(agents);
 
   // Phase 5: Recommendation
-  const recommended = recommend(agents, testResults, convergence);
+  const { recommended, scores } = recommend(agents, testResults, convergence);
 
   // Build result object
   const result: EnsembleResult = {
@@ -140,6 +140,7 @@ export async function run(opts: RunOptions): Promise<void> {
     tests: testResults,
     convergence,
     recommended,
+    scores,
   };
 
   // Display results

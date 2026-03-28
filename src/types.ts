@@ -37,6 +37,14 @@ export interface ConvergenceGroup {
   description: string;
 }
 
+export interface AgentScore {
+  agentId: number;
+  testPoints: number;
+  convergencePoints: number;
+  diffSizePoints: number;
+  total: number;
+}
+
 export interface EnsembleResult {
   prompt: string;
   model: string;
@@ -45,4 +53,5 @@ export interface EnsembleResult {
   tests: TestResult[];
   convergence: ConvergenceGroup[];
   recommended: number | null;
+  scores: AgentScore[];
 }
