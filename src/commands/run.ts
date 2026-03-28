@@ -92,12 +92,24 @@ async function saveResult(result: EnsembleResult): Promise<void> {
   const dir = ".thinktank";
   await mkdir(dir, { recursive: true });
 
-  // Save full result
+  // Strip agent stdout/stderr from saved results to avoid credential exposure
+  const sanitizedResult = {
+    ...result,
+    agents: result.agents.map((a) => ({
+      ...a,
+      output: a.output ? "[redacted — use worktree to inspect]" : "",
+      error: a.error ? "[redacted]" : undefined,
+    })),
+  };
+
+  // Save full result with restricted permissions (owner read/write only)
   const filename = `run-${result.timestamp.replace(/[:.]/g, "-")}.json`;
-  await writeFile(join(dir, filename), JSON.stringify(result, null, 2));
+  await writeFile(join(dir, filename), JSON.stringify(sanitizedResult, null, 2), { mode: 0o600 });
 
   // Save as latest
-  await writeFile(join(dir, "latest.json"), JSON.stringify(result, null, 2));
+  await writeFile(join(dir, "latest.json"), JSON.stringify(sanitizedResult, null, 2), {
+    mode: 0o600,
+  });
 
   console.log(`  Results saved to ${join(dir, filename)}`);
   console.log();
