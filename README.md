@@ -25,7 +25,10 @@ Run N parallel Claude Code agents on the same task, then select the best result 
 ## Quick start
 
 ```bash
-npm install -g thinktank
+# Install from source (npm package coming soon)
+git clone https://github.com/that-github-user/thinktank.git
+cd thinktank && npm install && npm run build
+npm link  # makes `thinktank` available globally
 
 # Run 3 parallel agents on a task
 thinktank run "fix the authentication bypass"
@@ -38,6 +41,10 @@ thinktank apply
 ```
 
 Requires [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated.
+
+### Models
+
+Use `--model` to select a Claude model: `sonnet` (default), `opus`, `haiku`, or a full model ID like `claude-opus-4-6`.
 
 ## How it works
 
