@@ -29,6 +29,7 @@ program
   .option("--timeout <seconds>", "Timeout per agent in seconds", "300")
   .option("--model <model>", "Claude model to use", "sonnet")
   .option("-r, --runner <name>", "AI coding tool to use (default: claude-code)")
+  .option("--threshold <number>", "Convergence clustering similarity threshold (0.0-1.0)", "0.3")
   .option("--verbose", "Show detailed output from each agent")
   .action(async (promptArg: string | undefined, opts) => {
     const prompt = resolvePrompt(promptArg, opts.file);
@@ -51,6 +52,12 @@ program
       process.exit(1);
     }
 
+    const threshold = parseFloat(opts.threshold);
+    if (Number.isNaN(threshold) || threshold < 0 || threshold > 1) {
+      console.error("Error: --threshold must be a number between 0.0 and 1.0");
+      process.exit(1);
+    }
+
     const knownModels = ["sonnet", "opus", "haiku"];
     if (!knownModels.includes(opts.model) && !opts.model.startsWith("claude-")) {
       console.warn(
@@ -65,6 +72,7 @@ program
       testTimeout,
       timeout,
       model: opts.model,
+      threshold,
       runner: opts.runner,
       verbose: opts.verbose ?? false,
     });

@@ -126,7 +126,7 @@ export async function run(opts: RunOptions): Promise<void> {
   }
 
   // Phase 4: Convergence analysis
-  const convergence = analyzeConvergence(agents);
+  const convergence = analyzeConvergence(agents, opts.threshold);
 
   // Phase 5: Recommendation
   const { recommended, scores } = recommend(agents, testResults, convergence);
