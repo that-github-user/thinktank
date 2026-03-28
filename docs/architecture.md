@@ -111,14 +111,16 @@ Each agent receives a composite score:
 |--------|--------|-----------|
 | Tests pass | +100 | Strongest signal — code works |
 | Convergence group | +0 to +50 | group_score × 50 — consensus is confidence |
-| Smaller diff | +0 to +10 | (1 - normalized_size) × 10 — simpler is better |
+| Diff size outlier | +0 to +10 | Penalizes diffs > 2× median size — catches agents that went off the rails |
+
+Normal-sized and thorough diffs all receive the full 10 points. Only outlier-large diffs (more than 2× the median diff size across agents) are penalized proportionally: `max(0, 10 - (ratio - 2) × 5)` where `ratio = agent_lines / median_lines`.
 
 The agent with the highest total score is recommended. Ties broken by the first agent.
 
 ### Why these weights?
 - Tests (100) dominate because correctness trumps everything
 - Convergence (50) is secondary — agreement without tests is weaker evidence
-- Diff size (10) is a tiebreaker — among equally correct solutions, prefer the simpler one
+- Diff size (10) is a tiebreaker — only penalizes outlier-large diffs that suggest an agent went off the rails, rather than rewarding minimal changes
 
 ## Security Model
 

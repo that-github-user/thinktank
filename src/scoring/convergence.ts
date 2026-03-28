@@ -120,7 +120,7 @@ function clusterAgents(
 
 /**
  * Recommend the best agent based on test results and convergence.
- * Priority: passing tests > convergence group size > smaller diff.
+ * Priority: passing tests > convergence group size > diff size outlier penalty.
  */
 export function recommend(
   agents: AgentResult[],
@@ -129,6 +129,14 @@ export function recommend(
 ): { recommended: number | null; scores: AgentScore[] } {
   const completed = agents.filter((a) => a.status === "success" && a.diff.length > 0);
   if (completed.length === 0) return { recommended: null, scores: [] };
+
+  // Compute median diff size for outlier detection
+  const sortedLines = completed.map((a) => a.linesAdded + a.linesRemoved).sort((a, b) => a - b);
+  const mid = Math.floor(sortedLines.length / 2);
+  const medianLines =
+    sortedLines.length % 2 === 0
+      ? (sortedLines[mid - 1]! + sortedLines[mid]!) / 2
+      : sortedLines[mid]!;
 
   const agentScores: AgentScore[] = [];
 
@@ -141,10 +149,10 @@ export function recommend(
     const group = convergence.find((g) => g.agents.includes(agent.id));
     const convergencePoints = group ? group.similarity * 50 : 0;
 
-    // Smaller diffs preferred (normalized)
-    const maxLines = Math.max(...completed.map((a) => a.linesAdded + a.linesRemoved), 1);
+    // Penalize outlier-large diffs (> 2x median), otherwise no penalty
     const agentLines = agent.linesAdded + agent.linesRemoved;
-    const diffSizePoints = (1 - agentLines / maxLines) * 10;
+    const ratio = medianLines > 0 ? agentLines / medianLines : 1;
+    const diffSizePoints = ratio > 2 ? Math.max(0, 10 - (ratio - 2) * 5) : 10;
 
     const total = testPoints + convergencePoints + diffSizePoints;
 

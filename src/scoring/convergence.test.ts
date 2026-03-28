@@ -159,15 +159,18 @@ describe("recommend", () => {
     assert.ok(result.recommended === 1 || result.recommended === 2);
   });
 
-  it("prefers smaller diffs as tiebreaker", () => {
+  it("penalizes outlier-large diffs (> 2x median) as tiebreaker", () => {
+    // Agent 1 has 70 lines (> 2x median of 35), agent 2 and 3 are normal
     const agents = [
-      makeAgent({ id: 1, diff: DIFF_A, linesAdded: 50, linesRemoved: 20 }),
-      makeAgent({ id: 2, diff: DIFF_A, linesAdded: 5, linesRemoved: 2 }),
+      makeAgent({ id: 1, diff: DIFF_A, linesAdded: 100, linesRemoved: 40 }),
+      makeAgent({ id: 2, diff: DIFF_A, linesAdded: 10, linesRemoved: 5 }),
+      makeAgent({ id: 3, diff: DIFF_A, linesAdded: 10, linesRemoved: 5 }),
     ];
     const convergence = analyzeConvergence(agents);
     const result = recommend(agents, [], convergence);
 
-    assert.equal(result.recommended, 2);
+    // Agents 2 and 3 are normal-sized and should be preferred over outlier agent 1
+    assert.ok(result.recommended === 2 || result.recommended === 3);
   });
 
   it("returns per-agent score breakdowns", () => {
@@ -204,10 +207,11 @@ describe("recommend", () => {
     );
   });
 
-  it("gives higher diffSizePoints to smaller diffs", () => {
+  it("gives equal diffSizePoints to non-outlier diffs", () => {
+    // Both agents are within 2x of median — should get the same score
     const agents = [
-      makeAgent({ id: 1, diff: DIFF_A, linesAdded: 50, linesRemoved: 20 }),
-      makeAgent({ id: 2, diff: DIFF_A, linesAdded: 5, linesRemoved: 2 }),
+      makeAgent({ id: 1, diff: DIFF_A, linesAdded: 20, linesRemoved: 10 }),
+      makeAgent({ id: 2, diff: DIFF_A, linesAdded: 10, linesRemoved: 5 }),
     ];
     const convergence = analyzeConvergence(agents);
     const result = recommend(agents, [], convergence);
@@ -217,6 +221,27 @@ describe("recommend", () => {
     assert.ok(score1);
     assert.ok(score2);
 
-    assert.ok(score2.diffSizePoints > score1.diffSizePoints);
+    assert.equal(score1.diffSizePoints, score2.diffSizePoints);
+    assert.equal(score1.diffSizePoints, 10);
+  });
+
+  it("penalizes diffSizePoints for outlier-large diffs", () => {
+    // Agent 1 is > 2x median, so it gets penalized
+    const agents = [
+      makeAgent({ id: 1, diff: DIFF_A, linesAdded: 100, linesRemoved: 50 }),
+      makeAgent({ id: 2, diff: DIFF_A, linesAdded: 10, linesRemoved: 5 }),
+      makeAgent({ id: 3, diff: DIFF_A, linesAdded: 10, linesRemoved: 5 }),
+    ];
+    const convergence = analyzeConvergence(agents);
+    const result = recommend(agents, [], convergence);
+
+    const score1 = result.scores.find((s) => s.agentId === 1);
+    const score2 = result.scores.find((s) => s.agentId === 2);
+    assert.ok(score1);
+    assert.ok(score2);
+
+    assert.ok(score1.diffSizePoints < score2.diffSizePoints);
+    assert.equal(score2.diffSizePoints, 10);
+    assert.ok(score1.diffSizePoints < 10);
   });
 });
