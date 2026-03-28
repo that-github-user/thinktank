@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import pc from "picocolors";
@@ -104,6 +104,12 @@ export async function apply(opts: ApplyOptions): Promise<void> {
     child.child.stdin?.write(agent.diff);
     child.child.stdin?.end();
     await child;
+
+    // Save patch for undo
+    const patchDir = join(repoRoot, ".thinktank");
+    await mkdir(patchDir, { recursive: true });
+    await writeFile(join(patchDir, "last-applied.patch"), agent.diff, "utf-8");
+
     console.log("  Changes applied successfully.");
   } catch (err: unknown) {
     const e = err as { stderr?: string };
