@@ -2,6 +2,7 @@
 
 import { Command } from "commander";
 import { apply } from "./commands/apply.js";
+import { compare } from "./commands/compare.js";
 import { list } from "./commands/list.js";
 import { run } from "./commands/run.js";
 
@@ -62,6 +63,16 @@ program
     await apply({
       agent: opts.agent ? parseInt(opts.agent, 10) : undefined,
       preview: opts.preview ?? false,
+    });
+  });
+
+program
+  .command("compare <agentA> <agentB>")
+  .description("Compare two agents' results side by side")
+  .action(async (agentA: string, agentB: string) => {
+    await compare({
+      agentA: parseInt(agentA, 10),
+      agentB: parseInt(agentB, 10),
     });
   });
 
