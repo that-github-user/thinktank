@@ -13,7 +13,7 @@ export interface Config {
 export const BUILT_IN_DEFAULTS: Config = {
   attempts: 3,
   model: "sonnet",
-  timeout: 300,
+  timeout: 600,
   runner: "claude-code",
   threshold: 0.3,
   testTimeout: 120,
@@ -49,8 +49,8 @@ function validateConfig(partial: Partial<Config>): string | null {
     }
   }
   if (partial.timeout !== undefined) {
-    if (!Number.isInteger(partial.timeout) || partial.timeout < 10 || partial.timeout > 600) {
-      return "timeout must be an integer between 10 and 600";
+    if (!Number.isInteger(partial.timeout) || partial.timeout < 10 || partial.timeout > 1800) {
+      return "timeout must be an integer between 10 and 1800";
     }
   }
   if (partial.testTimeout !== undefined) {

@@ -57,8 +57,8 @@ program
     }
 
     const timeout = parseInt(opts.timeout, 10);
-    if (Number.isNaN(timeout) || timeout < 10 || timeout > 600) {
-      console.error("Error: --timeout must be a number between 10 and 600 seconds");
+    if (Number.isNaN(timeout) || timeout < 10 || timeout > 1800) {
+      console.error("Error: --timeout must be a number between 10 and 1800 seconds");
       process.exit(1);
     }
 

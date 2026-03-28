@@ -37,7 +37,7 @@ describe("config", () => {
     it("has expected default values", () => {
       assert.equal(BUILT_IN_DEFAULTS.attempts, 3);
       assert.equal(BUILT_IN_DEFAULTS.model, "sonnet");
-      assert.equal(BUILT_IN_DEFAULTS.timeout, 300);
+      assert.equal(BUILT_IN_DEFAULTS.timeout, 600);
       assert.equal(BUILT_IN_DEFAULTS.runner, "claude-code");
       assert.equal(BUILT_IN_DEFAULTS.threshold, 0.3);
       assert.equal(BUILT_IN_DEFAULTS.testTimeout, 120);
@@ -103,7 +103,7 @@ describe("config", () => {
       const result = loadConfig();
       assert.equal(result.attempts, 7);
       assert.equal(result.model, "sonnet");
-      assert.equal(result.timeout, 300);
+      assert.equal(result.timeout, 600);
     });
   });
 
@@ -151,7 +151,7 @@ describe("config", () => {
     it("returns error for out-of-range timeout", () => {
       const error = setConfigValue("timeout", "5");
       assert.ok(error);
-      assert.match(error, /timeout must be an integer between 10 and 600/);
+      assert.match(error, /timeout must be an integer between 10 and 1800/);
     });
 
     it("returns error for out-of-range threshold", () => {
