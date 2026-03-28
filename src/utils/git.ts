@@ -46,7 +46,10 @@ export async function getDiff(worktreePath: string): Promise<string> {
       cwd: worktreePath,
     });
     return stdout;
-  } catch {
+  } catch (err) {
+    console.warn(
+      `[thinktank] getDiff failed for worktree ${worktreePath}: ${err instanceof Error ? err.message : String(err)}`,
+    );
     return "";
   }
 }
@@ -76,7 +79,10 @@ export async function getDiffStats(
     }
 
     return { filesChanged, linesAdded, linesRemoved };
-  } catch {
+  } catch (err) {
+    console.warn(
+      `[thinktank] getDiffStats failed for worktree ${worktreePath}: ${err instanceof Error ? err.message : String(err)}`,
+    );
     return { filesChanged: [], linesAdded: 0, linesRemoved: 0 };
   }
 }
