@@ -7,7 +7,7 @@ import { compare } from "./commands/compare.js";
 import { type ConfigAction, config } from "./commands/config.js";
 import { evaluate } from "./commands/evaluate.js";
 import { list } from "./commands/list.js";
-import { run } from "./commands/run.js";
+import { retry, run } from "./commands/run.js";
 import { stats } from "./commands/stats.js";
 import { undo } from "./commands/undo.js";
 import { loadConfig } from "./utils/config.js";
@@ -48,15 +48,8 @@ program
   .option("--no-color", "Disable colored output")
   .option("--output-format <format>", "Output format: text (default) or json", "text")
   .option("--verbose", "Show detailed output from each agent")
+  .option("--retry", "Re-run only failed/timed-out agents from the last run")
   .action(async (promptArg: string | undefined, opts) => {
-    const prompt = resolvePrompt(promptArg, opts.file);
-
-    const attempts = parseInt(opts.attempts, 10);
-    if (Number.isNaN(attempts) || attempts < 1 || attempts > 20) {
-      console.error("Error: --attempts must be a number between 1 and 20");
-      process.exit(1);
-    }
-
     const testTimeout = parseInt(opts.testTimeout, 10);
     if (Number.isNaN(testTimeout) || testTimeout < 10 || testTimeout > 600) {
       console.error("Error: --test-timeout must be a number between 10 and 600 seconds");
@@ -89,6 +82,33 @@ program
     const validFormats = ["text", "json"];
     if (!validFormats.includes(opts.outputFormat)) {
       console.error(`Error: --output-format must be one of: ${validFormats.join(", ")}`);
+      process.exit(1);
+    }
+
+    // --retry: re-run only failed agents from last run, ignore --attempts and prompt
+    if (opts.retry) {
+      await retry({
+        prompt: "", // ignored — loaded from previous result
+        attempts: 0, // ignored — determined by failed agent count
+        testCmd: opts.testCmd,
+        testTimeout,
+        timeout,
+        model: opts.model,
+        threshold,
+        runner: opts.runner,
+        scoring: opts.scoring,
+        verbose: opts.verbose ?? false,
+        outputFormat: opts.outputFormat,
+        retry: true,
+      });
+      return;
+    }
+
+    const prompt = resolvePrompt(promptArg, opts.file);
+
+    const attempts = parseInt(opts.attempts, 10);
+    if (Number.isNaN(attempts) || attempts < 1 || attempts > 20) {
+      console.error("Error: --attempts must be a number between 1 and 20");
       process.exit(1);
     }
 
