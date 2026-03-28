@@ -24,11 +24,30 @@ program
   .option("--model <model>", "Claude model to use", "sonnet")
   .option("--verbose", "Show detailed output from each agent")
   .action(async (prompt: string, opts) => {
+    const attempts = parseInt(opts.attempts, 10);
+    if (Number.isNaN(attempts) || attempts < 1 || attempts > 20) {
+      console.error("Error: --attempts must be a number between 1 and 20");
+      process.exit(1);
+    }
+
+    const timeout = parseInt(opts.timeout, 10);
+    if (Number.isNaN(timeout) || timeout < 10 || timeout > 600) {
+      console.error("Error: --timeout must be a number between 10 and 600 seconds");
+      process.exit(1);
+    }
+
+    const knownModels = ["sonnet", "opus", "haiku"];
+    if (!knownModels.includes(opts.model) && !opts.model.startsWith("claude-")) {
+      console.warn(
+        `Warning: unknown model "${opts.model}" — known models: ${knownModels.join(", ")}`,
+      );
+    }
+
     await run({
       prompt,
-      attempts: parseInt(opts.attempts, 10),
+      attempts,
       testCmd: opts.testCmd,
-      timeout: parseInt(opts.timeout, 10),
+      timeout,
       model: opts.model,
       verbose: opts.verbose ?? false,
     });
