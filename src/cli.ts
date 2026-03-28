@@ -5,6 +5,7 @@ import { apply } from "./commands/apply.js";
 import { clean } from "./commands/clean.js";
 import { compare } from "./commands/compare.js";
 import { type ConfigAction, config } from "./commands/config.js";
+import { evaluate } from "./commands/evaluate.js";
 import { list } from "./commands/list.js";
 import { run } from "./commands/run.js";
 import { stats } from "./commands/stats.js";
@@ -144,6 +145,13 @@ program
   .description("Show aggregate statistics across all thinktank runs")
   .action(async () => {
     await stats();
+  });
+
+program
+  .command("evaluate")
+  .description("Compare scoring methods (weighted vs Copeland vs Borda) across all runs")
+  .action(async () => {
+    await evaluate();
   });
 
 const configCmd = program
