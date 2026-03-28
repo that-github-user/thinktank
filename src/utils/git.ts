@@ -11,11 +11,6 @@ export async function getRepoRoot(): Promise<string> {
   return stdout.trim();
 }
 
-export async function getCurrentBranch(): Promise<string> {
-  const { stdout } = await exec("git", ["rev-parse", "--abbrev-ref", "HEAD"]);
-  return stdout.trim();
-}
-
 export async function createWorktree(id: number): Promise<string> {
   const repoRoot = await getRepoRoot();
   const dir = await mkdtemp(join(tmpdir(), `thinktank-agent-${id}-`));
@@ -83,21 +78,6 @@ export async function getDiffStats(
   } catch {
     return { filesChanged: [], linesAdded: 0, linesRemoved: 0 };
   }
-}
-
-export async function applyDiff(diff: string, targetDir: string): Promise<void> {
-  const { execFile: execFileCb } = await import("node:child_process");
-  const child = execFileCb("git", ["apply", "--3way", "-"], {
-    cwd: targetDir,
-  });
-  child.stdin?.write(diff);
-  child.stdin?.end();
-  await new Promise<void>((resolve, reject) => {
-    child.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`git apply failed with code ${code}`));
-    });
-  });
 }
 
 export async function cleanupBranches(): Promise<void> {
