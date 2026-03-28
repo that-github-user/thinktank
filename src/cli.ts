@@ -9,6 +9,7 @@ import { evaluate } from "./commands/evaluate.js";
 import { list } from "./commands/list.js";
 import { run } from "./commands/run.js";
 import { stats } from "./commands/stats.js";
+import { undo } from "./commands/undo.js";
 import { loadConfig } from "./utils/config.js";
 import { resolvePrompt } from "./utils/prompt.js";
 
@@ -111,6 +112,13 @@ program
       preview: opts.preview ?? false,
       dryRun: opts.dryRun ?? false,
     });
+  });
+
+program
+  .command("undo")
+  .description("Reverse the last applied diff (from `thinktank apply`)")
+  .action(async () => {
+    await undo();
   });
 
 program
