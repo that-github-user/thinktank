@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 
 const exec = promisify(execFile);
@@ -12,8 +12,18 @@ export async function getRepoRoot(): Promise<string> {
   return stdout.trim();
 }
 
+/**
+ * Returns the root of the main repository, even when called from inside a worktree.
+ * This is necessary because git does not support nested worktrees.
+ */
+async function getMainRepoRoot(): Promise<string> {
+  const { stdout } = await exec("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+  // --git-common-dir returns /path/to/main-repo/.git for both worktrees and the main repo
+  return dirname(stdout.trim());
+}
+
 export async function createWorktree(id: number): Promise<string> {
-  const repoRoot = await getRepoRoot();
+  const repoRoot = await getMainRepoRoot();
   const dir = await mkdtemp(join(tmpdir(), `thinktank-agent-${id}-`));
   const branchName = `thinktank/agent-${id}-${randomUUID().slice(0, 8)}`;
 
@@ -21,11 +31,38 @@ export async function createWorktree(id: number): Promise<string> {
     cwd: repoRoot,
   });
 
+  // Symlink node_modules from the main repo so tests and tools work in worktrees.
+  // Git worktrees don't include gitignored directories like node_modules.
+  const mainNodeModules = join(repoRoot, "node_modules");
+  const worktreeNodeModules = join(dir, "node_modules");
+  try {
+    const { lstat, symlink } = await import("node:fs/promises");
+    await lstat(mainNodeModules);
+    await symlink(mainNodeModules, worktreeNodeModules, "junction");
+  } catch {
+    // No node_modules in main repo or symlink failed — not critical
+  }
+
   return dir;
 }
 
 export async function removeWorktree(worktreePath: string): Promise<void> {
-  const repoRoot = await getRepoRoot();
+  const repoRoot = await getMainRepoRoot();
+
+  // Remove node_modules symlink/junction BEFORE removing worktree.
+  // On Windows, rm -rf follows junctions and deletes the target.
+  try {
+    const nmPath = join(worktreePath, "node_modules");
+    const { lstat, unlink } = await import("node:fs/promises");
+    const stat = await lstat(nmPath);
+    if (stat.isSymbolicLink() || stat.isDirectory()) {
+      // unlink removes the junction/symlink without following it
+      await unlink(nmPath).catch(() => {});
+    }
+  } catch {
+    // No symlink to remove
+  }
+
   try {
     await exec("git", ["worktree", "remove", worktreePath, "--force"], {
       cwd: repoRoot,
@@ -88,7 +125,7 @@ export async function getDiffStats(
 }
 
 export async function cleanupBranches(): Promise<void> {
-  const repoRoot = await getRepoRoot();
+  const repoRoot = await getMainRepoRoot();
   const { stdout } = await exec("git", ["branch", "--list", "thinktank/*"], {
     cwd: repoRoot,
   });

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { after, before, describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 import {
   cleanupBranches,
   createWorktree,
