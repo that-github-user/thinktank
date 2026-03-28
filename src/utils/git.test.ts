@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { after, before, describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 import {
   cleanupBranches,
   createWorktree,
   getDiff,
   getDiffStats,
   getRepoRoot,
+  isInsideWorktree,
   removeWorktree,
 } from "./git.js";
 
@@ -17,28 +18,34 @@ describe("getRepoRoot", () => {
   });
 });
 
-describe("worktree lifecycle", () => {
+describe("worktree lifecycle", async () => {
+  const inWorktree = await isInsideWorktree();
+
   let worktreePath: string;
 
-  it("creates a worktree", async () => {
+  it("creates a worktree", { skip: inWorktree && "cannot nest worktrees" }, async () => {
     worktreePath = await createWorktree(99);
     assert.ok(worktreePath.length > 0);
     assert.ok(worktreePath.includes("thinktank-agent-99"));
   });
 
-  it("gets empty diff for unchanged worktree", async () => {
+  it("gets empty diff for unchanged worktree", {
+    skip: inWorktree && "cannot nest worktrees",
+  }, async () => {
     const diff = await getDiff(worktreePath);
     assert.equal(diff, "");
   });
 
-  it("gets empty diff stats for unchanged worktree", async () => {
+  it("gets empty diff stats for unchanged worktree", {
+    skip: inWorktree && "cannot nest worktrees",
+  }, async () => {
     const stats = await getDiffStats(worktreePath);
     assert.deepEqual(stats.filesChanged, []);
     assert.equal(stats.linesAdded, 0);
     assert.equal(stats.linesRemoved, 0);
   });
 
-  it("removes the worktree", async () => {
+  it("removes the worktree", { skip: inWorktree && "cannot nest worktrees" }, async () => {
     await removeWorktree(worktreePath);
     // Should not throw
   });

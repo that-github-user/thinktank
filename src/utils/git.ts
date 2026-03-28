@@ -12,6 +12,12 @@ export async function getRepoRoot(): Promise<string> {
   return stdout.trim();
 }
 
+export async function isInsideWorktree(): Promise<boolean> {
+  const { stdout: gitDir } = await exec("git", ["rev-parse", "--git-dir"]);
+  const { stdout: commonDir } = await exec("git", ["rev-parse", "--git-common-dir"]);
+  return gitDir.trim() !== commonDir.trim();
+}
+
 export async function createWorktree(id: number): Promise<string> {
   const repoRoot = await getRepoRoot();
   const dir = await mkdtemp(join(tmpdir(), `thinktank-agent-${id}-`));
