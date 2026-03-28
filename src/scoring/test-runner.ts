@@ -1,10 +1,10 @@
-import { execFile } from "node:child_process";
+import { exec as execCb } from "node:child_process";
 import { access } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import type { TestResult } from "../types.js";
 
-const exec = promisify(execFile);
+const exec = promisify(execCb);
 
 const TEST_TIMEOUT_MS = 120_000;
 
@@ -62,7 +62,8 @@ export async function runTests(
   }
 
   try {
-    const { stdout, stderr } = await exec(cmd, args, {
+    // Use shell execution so npx, npm, etc. resolve correctly on all platforms
+    const { stdout, stderr } = await exec(testCmd, {
       cwd: worktreePath,
       timeout: TEST_TIMEOUT_MS,
       env: { ...process.env, CI: "true" },
@@ -89,16 +90,6 @@ export async function runTests(
         passed: false,
         output: `Test command timed out after ${TEST_TIMEOUT_MS / 1000}s`,
         exitCode: 124,
-      };
-    }
-
-    // Command not found
-    if (typeof e.code === "string" && e.code === "ENOENT") {
-      return {
-        agentId,
-        passed: false,
-        output: `Command not found: ${cmd}. Is it installed?`,
-        exitCode: 127,
       };
     }
 
