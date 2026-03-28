@@ -73,10 +73,14 @@ export async function run(opts: RunOptions): Promise<void> {
   };
   process.on("SIGINT", handleSigint);
 
-  for (let i = 1; i <= opts.attempts; i++) {
-    const path = await createWorktree(i);
-    worktrees.push({ id: i, path });
-    console.log(`    Agent #${i}: ${path}`);
+  const worktreeResults = await Promise.all(
+    Array.from({ length: opts.attempts }, (_, i) =>
+      createWorktree(i + 1).then((path) => ({ id: i + 1, path })),
+    ),
+  );
+  for (const wt of worktreeResults) {
+    worktrees.push(wt);
+    console.log(`    Agent #${wt.id}: ${wt.path}`);
   }
   console.log();
 
