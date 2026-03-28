@@ -96,13 +96,14 @@ describe("runTests", () => {
   });
 
   it("returns success for passing command", async () => {
-    const result = await runTests(1, "node --eval process.exit(0)", ".");
+    const result = await runTests(1, "node --version", ".");
     assert.equal(result.passed, true);
     assert.equal(result.exitCode, 0);
   });
 
   it("returns failure for failing command", async () => {
-    const result = await runTests(1, "node --eval process.exit(1)", ".");
+    // --require a non-existent module to trigger a guaranteed non-zero exit
+    const result = await runTests(1, "node --require ./nonexistent-module.js", ".");
     assert.equal(result.passed, false);
     assert.ok(result.exitCode !== 0);
   });
