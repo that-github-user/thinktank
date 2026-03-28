@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,7 +15,7 @@ export async function getRepoRoot(): Promise<string> {
 export async function createWorktree(id: number): Promise<string> {
   const repoRoot = await getRepoRoot();
   const dir = await mkdtemp(join(tmpdir(), `thinktank-agent-${id}-`));
-  const branchName = `thinktank/agent-${id}-${Date.now()}`;
+  const branchName = `thinktank/agent-${id}-${randomUUID().slice(0, 8)}`;
 
   await exec("git", ["worktree", "add", "-b", branchName, dir], {
     cwd: repoRoot,
