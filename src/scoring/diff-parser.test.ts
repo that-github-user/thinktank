@@ -54,6 +54,17 @@ diff --git a/b.ts b/b.ts
   it("handles empty diff", () => {
     assert.deepEqual(parseDiff(""), []);
   });
+
+  it("handles filenames with spaces (quoted paths)", () => {
+    const quotedDiff = `diff --git "a/src/my component.tsx" "b/src/my component.tsx"
+--- "a/src/my component.tsx"
++++ "b/src/my component.tsx"
+@@ -1 +1 @@
++export default function MyComponent() {}`;
+    const files = parseDiff(quotedDiff);
+    assert.equal(files.length, 1);
+    assert.equal(files[0]!.path, "src/my component.tsx");
+  });
 });
 
 describe("diffSimilarity", () => {

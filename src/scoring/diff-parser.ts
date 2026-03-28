@@ -19,7 +19,8 @@ export function parseDiff(diff: string): DiffFile[] {
   for (const line of diff.split("\n")) {
     // New file header: diff --git a/path b/path
     if (line.startsWith("diff --git")) {
-      const match = line.match(/diff --git a\/(.+) b\/(.+)/);
+      // Handle both quoted and unquoted paths (spaces in filenames)
+      const match = line.match(/diff --git "?a\/(.+?)"? "?b\/(.+?)"?$/);
       if (match?.[2]) {
         current = { path: match[2], addedLines: [], removedLines: [] };
         files.push(current);
