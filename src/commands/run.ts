@@ -110,6 +110,11 @@ export async function run(opts: RunOptions): Promise<void> {
   // can inspect them. They get cleaned up on next run.
 }
 
+export function makeResultFilename(timestamp: string): string {
+  const safe = timestamp.replace(/[:.]/g, "-");
+  return `run-${safe}.json`;
+}
+
 async function saveResult(result: EnsembleResult): Promise<void> {
   const dir = ".thinktank";
   await mkdir(dir, { recursive: true });
@@ -125,7 +130,7 @@ async function saveResult(result: EnsembleResult): Promise<void> {
   };
 
   // Save full result with restricted permissions (owner read/write only)
-  const filename = `run-${result.timestamp.replace(/[:.]/g, "-")}.json`;
+  const filename = makeResultFilename(result.timestamp);
   await writeFile(join(dir, filename), JSON.stringify(sanitizedResult, null, 2), { mode: 0o600 });
 
   // Save as latest
