@@ -132,6 +132,23 @@ export async function getDiffStats(
   }
 }
 
+/**
+ * Estimate the size of the git repo in bytes using `git count-objects -v`.
+ * Returns the sum of loose object size and pack size (a rough lower bound
+ * for the size of a checked-out worktree).
+ */
+export async function estimateRepoSize(): Promise<number> {
+  const { stdout } = await exec("git", ["count-objects", "-v"]);
+  let sizeKB = 0;
+  for (const line of stdout.split("\n")) {
+    const match = line.match(/^(size|size-pack):\s+(\d+)/);
+    if (match?.[2]) {
+      sizeKB += parseInt(match[2], 10);
+    }
+  }
+  return sizeKB * 1024;
+}
+
 export async function cleanupBranches(): Promise<void> {
   const repoRoot = await getMainRepoRoot();
   const { stdout } = await exec("git", ["branch", "--list", "thinktank/*"], {
