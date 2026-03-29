@@ -306,6 +306,9 @@ export async function retry(opts: RunOptions): Promise<void> {
   // Display results
   if (opts.outputFormat === "json") {
     console.log(JSON.stringify(result));
+  } else if (opts.outputFormat === "diff") {
+    const recAgent = result.agents.find((a) => a.id === result.recommended);
+    if (recAgent?.diff) process.stdout.write(recAgent.diff);
   } else {
     displayResults(result);
     displayApplyInstructions(result);
@@ -506,6 +509,9 @@ export async function run(opts: RunOptions): Promise<void> {
   // Display results
   if (opts.outputFormat === "json") {
     console.log(JSON.stringify(result));
+  } else if (opts.outputFormat === "diff") {
+    const recAgent = result.agents.find((a) => a.id === result.recommended);
+    if (recAgent?.diff) process.stdout.write(recAgent.diff);
   } else {
     displayResults(result);
     displayApplyInstructions(result);

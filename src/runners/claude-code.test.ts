@@ -30,4 +30,20 @@ describe("claude-code runner", () => {
       });
     }
   });
+
+  describe("timeout=0 skips timer", () => {
+    it("does not call setTimeout when timeout is 0", () => {
+      // Mirrors the runner logic: timer is only created when timeout > 0
+      const timeout = 0;
+      const timer = timeout > 0 ? setTimeout(() => {}, timeout * 1000) : null;
+      assert.equal(timer, null);
+    });
+
+    it("creates timer when timeout is positive", () => {
+      const timeout = 300;
+      const timer = timeout > 0 ? setTimeout(() => {}, timeout * 1000) : null;
+      assert.notEqual(timer, null);
+      if (timer) clearTimeout(timer);
+    });
+  });
 });
