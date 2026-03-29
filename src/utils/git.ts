@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { access, mkdtemp, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -31,6 +31,13 @@ export async function createWorktree(id: number): Promise<string> {
     cwd: repoRoot,
   });
 
+  // Lock the worktree to prevent git gc --auto from pruning it while agents run.
+  // Without this, concurrent agents' git commits can trigger gc which prunes
+  // other worktrees' metadata from .git/worktrees/.
+  await exec("git", ["worktree", "lock", "--reason", "thinktank agent in use", dir], {
+    cwd: repoRoot,
+  });
+
   // Symlink node_modules from the main repo so tests and tools work in worktrees.
   // Git worktrees don't include gitignored directories like node_modules.
   const mainNodeModules = join(repoRoot, "node_modules");
@@ -48,6 +55,9 @@ export async function createWorktree(id: number): Promise<string> {
 
 export async function removeWorktree(worktreePath: string): Promise<void> {
   const repoRoot = await getMainRepoRoot();
+
+  // Unlock the worktree before removal (it was locked during creation)
+  await exec("git", ["worktree", "unlock", worktreePath], { cwd: repoRoot }).catch(() => {});
 
   // Remove node_modules symlink/junction BEFORE removing worktree.
   // On Windows, rm -rf follows junctions and deletes the target.
@@ -77,9 +87,14 @@ export async function removeWorktree(worktreePath: string): Promise<void> {
 export async function getDiff(worktreePath: string): Promise<string> {
   const absPath = resolve(worktreePath);
   try {
-    // Verify worktree is still a git repo before running git commands
+    // Verify worktree .git file AND its metadata directory still exist.
+    // git gc --auto can prune .git/worktrees/NAME/ even if the .git pointer file remains.
     await access(join(absPath, ".git"));
-    await exec("git", ["rev-parse", "--git-dir"], { cwd: absPath });
+    const gitContent = await readFile(join(absPath, ".git"), "utf-8");
+    const gitdirMatch = gitContent.match(/gitdir:\s*(.+)/);
+    if (gitdirMatch?.[1]) {
+      await access(gitdirMatch[1].trim());
+    }
 
     await exec("git", ["add", "-A"], { cwd: absPath });
     await exec("git", ["reset", "HEAD", "--", "node_modules"], { cwd: absPath }).catch(() => {});
@@ -99,6 +114,11 @@ export async function getDiffStats(
   const absPath = resolve(worktreePath);
   try {
     await access(join(absPath, ".git"));
+    const gitContent = await readFile(join(absPath, ".git"), "utf-8");
+    const gitdirMatch = gitContent.match(/gitdir:\s*(.+)/);
+    if (gitdirMatch?.[1]) {
+      await access(gitdirMatch[1].trim());
+    }
     await exec("git", ["add", "-A"], { cwd: absPath });
     await exec("git", ["reset", "HEAD", "--", "node_modules"], { cwd: absPath }).catch(() => {});
     const { stdout } = await exec("git", ["diff", "--cached", "--stat", "HEAD"], {
