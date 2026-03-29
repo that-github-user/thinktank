@@ -1,9 +1,11 @@
+import { execFile } from "node:child_process";
 import { mkdir, readFile, statfs, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { getDefaultRunner, getRunner } from "../runners/registry.js";
 import { analyzeConvergence, copelandRecommend, recommend } from "../scoring/convergence.js";
-import { runTests, validateTestCommand } from "../scoring/test-runner.js";
+import { parseTestCommand, runTests, validateTestCommand } from "../scoring/test-runner.js";
 import type { AgentResult, EnsembleResult, RunOptions } from "../types.js";
 import { displayApplyInstructions, displayHeader, displayResults } from "../utils/display.js";
 import {
@@ -13,6 +15,8 @@ import {
   getRepoRoot,
   removeWorktree,
 } from "../utils/git.js";
+
+const execFileAsync = promisify(execFile);
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 * 1024 * 1024) {
@@ -163,6 +167,15 @@ export async function retry(opts: RunOptions): Promise<void> {
     process.exit(1);
   }
 
+  // Pre-flight test run: catch broken test environments before spawning agents
+  if (opts.testCmd) {
+    const repoRoot = await getRepoRoot();
+    const testWarning = await preflightTestRun(opts.testCmd, repoRoot);
+    if (testWarning) {
+      console.warn(`  ⚠ ${testWarning}`);
+    }
+  }
+
   // Clean up old worktrees
   await cleanupBranches().catch(() => {});
 
@@ -284,6 +297,34 @@ export async function retry(opts: RunOptions): Promise<void> {
   process.removeListener("SIGINT", handleSigint);
 }
 
+/**
+ * Run the test command once on the current branch before spawning agents.
+ * Returns a warning string if the tests fail, or null if they pass.
+ */
+export async function preflightTestRun(testCmd: string, repoRoot: string): Promise<string | null> {
+  const { cmd, args } = parseTestCommand(testCmd);
+  if (!cmd) return null;
+
+  try {
+    await execFileAsync(cmd, args, {
+      cwd: repoRoot,
+      timeout: 60_000,
+      shell: true,
+      env: { ...process.env, CI: "true" },
+    });
+    return null;
+  } catch (err: unknown) {
+    const e = err as { stdout?: string; stderr?: string; code?: number | string };
+    const output = ((e.stdout ?? "") + (e.stderr ?? "")).trim();
+    const snippet = output.length > 200 ? `${output.slice(0, 200)}...` : output;
+    return (
+      `Test command "${testCmd}" failed on the current branch before spawning agents. ` +
+      "Your test environment may already be broken.\n" +
+      (snippet ? `  Output: ${snippet}` : "")
+    );
+  }
+}
+
 export async function run(opts: RunOptions): Promise<void> {
   displayHeader(opts.prompt, opts.attempts, opts.model);
 
@@ -308,6 +349,15 @@ export async function run(opts: RunOptions): Promise<void> {
   if (preflightError) {
     console.error(`  ${preflightError}`);
     process.exit(1);
+  }
+
+  // Pre-flight test run: catch broken test environments before spawning agents
+  if (opts.testCmd) {
+    const repoRoot = await getRepoRoot();
+    const testWarning = await preflightTestRun(opts.testCmd, repoRoot);
+    if (testWarning) {
+      console.warn(`  ⚠ ${testWarning}`);
+    }
   }
 
   // Clean up any leftover worktrees/branches from previous runs
