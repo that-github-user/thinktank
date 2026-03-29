@@ -40,6 +40,9 @@ thinktank run "fix the race condition" -n 5 -t "npm test"
 # Read prompt from a file (avoids shell expansion issues)
 thinktank run -f task.md -n 5 -t "npm test"
 
+# Pipe prompt from stdin
+echo "refactor the parser" | thinktank run -n 3
+
 # Apply the best result
 thinktank apply
 
@@ -97,9 +100,9 @@ Use `--model` to select a Claude model: `sonnet` (default), `opus`, `haiku`, or 
 
 The default scoring method is **Copeland pairwise ranking**. Every agent is compared head-to-head against every other agent across four criteria: tests passed, convergence group size, minimal file scope, and test files contributed. The agent that wins the most pairwise matchups is recommended.
 
-An alternative `--scoring weighted` method is also available, which assigns point values to tests (100), convergence (50), and diff size (10).
+An alternative `--scoring weighted` method is also available, which assigns point values to tests (100), convergence (50), and diff size (10). A third method, **Borda count** (rank aggregation), is available for comparison via `thinktank evaluate`.
 
-Use `thinktank evaluate` to compare how different scoring methods rank your results. See [docs/scoring-evaluation.md](docs/scoring-evaluation.md) for the full analysis.
+Use `thinktank evaluate` to compare how all three scoring methods rank your results. See [docs/scoring-evaluation.md](docs/scoring-evaluation.md) for the full analysis.
 
 ## Why this works
 
@@ -118,7 +121,7 @@ The key insight: **parallel attempts cost more tokens but not more time.** All a
 - **High-stakes changes** — auth, payments, security, data migrations
 - **Ambiguous tasks** — multiple valid approaches, need to see the spread
 - **Complex refactors** — many files, easy to miss something
-- **Unfamiliar codebases** — agents might go the wrong direction
+- **Unfamiliar codebases** — multiple attempts reduce the chance of going down the wrong path
 
 ## Commands
 
@@ -131,11 +134,12 @@ Run N parallel agents on a task.
 | `-n, --attempts <N>` | Number of parallel agents (default: 3, max: 20) |
 | `-f, --file <path>` | Read prompt from a file |
 | `-t, --test-cmd <cmd>` | Test command to verify results |
-| `--test-timeout <sec>` | Timeout for test command (default: 120s) |
-| `--timeout <sec>` | Timeout per agent (default: 600s) |
+| `--test-timeout <sec>` | Timeout for test command in seconds (default: 120, max: 600) |
+| `--timeout <sec>` | Timeout per agent in seconds (default: 600, max: 1800) |
 | `--model <model>` | Claude model: sonnet, opus, haiku, or full ID |
+| `-r, --runner <name>` | AI coding tool to use (default: claude-code) |
 | `--scoring <method>` | Scoring method: `copeland` (default) or `weighted` |
-| `--threshold <0-1>` | Convergence clustering similarity threshold |
+| `--threshold <number>` | Convergence clustering similarity threshold, 0.0–1.0 (default: 0.3) |
 | `--whitespace-insensitive` | Ignore whitespace in convergence comparison |
 | `--retry` | Re-run only failed/timed-out agents from the last run |
 | `--output-format <fmt>` | Output format: `text` (default) or `json` |
@@ -148,9 +152,9 @@ Apply the recommended agent's changes to your working tree.
 
 | Flag | Description |
 |------|-------------|
-| `-a, --agent <N>` | Apply a specific agent's result |
+| `-a, --agent <N>` | Apply a specific agent's result instead of the recommended one |
 | `-p, --preview` | Show the diff without applying |
-| `-d, --dry-run` | Show what would be applied without making changes |
+| `-d, --dry-run` | Same as `--preview` (alias) |
 
 ### `thinktank undo`
 
@@ -196,6 +200,13 @@ thinktank config list              # show all values
 
 Available keys: `attempts`, `model`, `timeout`, `runner`, `threshold`, `testTimeout`.
 
+## Pre-flight checks
+
+Before spawning agents, thinktank validates the environment:
+
+1. **Disk space** — warns if there isn't enough room for N worktrees
+2. **Test suite** — if `--test-cmd` is set, runs the tests once on the main branch to verify the suite passes before spending tokens on parallel agents
+
 ## Example output
 
 ```
@@ -226,11 +237,11 @@ Copeland Pairwise Scoring
 ────────────────────────────────────────────────────────────
   Agent   Tests     Converge  Scope     TestCov   Copeland
   ──────────────────────────────────────────────────────────
->> #1     +3        +1        0         +1        +4
-  #2      +3        +1        0         +1        +4
-  #3      +3        -4        -4        +1        -4
-  #4      -4        +1        +4        -4        -4
-  #5      +3        +1        0         +1        +4
+>> #1     +1        +2        0         +1        +4
+  #2      +1        +2        0         0         +3
+  #3      +1        -3        -4        0         -6
+  #4      -4        -3        +4        -1        -4
+  #5      +1        +2        0         0         +3
 
   Recommended: Agent #1 (Copeland winner)
 ```
