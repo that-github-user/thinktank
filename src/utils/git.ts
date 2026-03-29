@@ -1,6 +1,5 @@
 import { execFile } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -25,27 +24,25 @@ async function getMainRepoRoot(): Promise<string> {
 export async function createWorktree(id: number): Promise<string> {
   const repoRoot = await getMainRepoRoot();
   const dir = await mkdtemp(join(tmpdir(), `thinktank-agent-${id}-`));
-  const branchName = `thinktank/agent-${id}-${randomUUID().slice(0, 8)}`;
 
-  await exec("git", ["worktree", "add", "-b", branchName, dir], {
-    cwd: repoRoot,
-  });
+  // Use git clone instead of git worktree to create fully independent copies.
+  // Worktrees share .git metadata with the main repo, allowing agents to discover
+  // and interfere with the main repo (via .git pointer file, git -C commands, or
+  // git worktree add --force). Clones are completely isolated — no shared state,
+  // no metadata to corrupt, no path to the main repo.
+  // Local clone uses hardlinks for objects (near-zero extra disk, ~0.1s).
+  // Each clone has a fully independent .git directory — no shared metadata,
+  // no alternates file pointing to parent, no worktree registration to corrupt.
+  // Agents with Bash access cannot interfere with other clones or the main repo.
+  await exec("git", ["clone", repoRoot, dir]);
 
-  // Lock the worktree to prevent git gc --auto from pruning it while agents run.
-  // Without this, concurrent agents' git commits can trigger gc which prunes
-  // other worktrees' metadata from .git/worktrees/.
-  await exec("git", ["worktree", "lock", "--reason", "thinktank agent in use", dir], {
-    cwd: repoRoot,
-  });
-
-  // Symlink node_modules from the main repo so tests and tools work in worktrees.
-  // Git worktrees don't include gitignored directories like node_modules.
+  // Symlink node_modules from the main repo so tests and tools work in clones.
   const mainNodeModules = join(repoRoot, "node_modules");
-  const worktreeNodeModules = join(dir, "node_modules");
+  const cloneNodeModules = join(dir, "node_modules");
   try {
     const { lstat, symlink } = await import("node:fs/promises");
     await lstat(mainNodeModules);
-    await symlink(mainNodeModules, worktreeNodeModules, "junction");
+    await symlink(mainNodeModules, cloneNodeModules, "junction");
   } catch {
     // No node_modules in main repo or symlink failed — not critical
   }
@@ -54,48 +51,26 @@ export async function createWorktree(id: number): Promise<string> {
 }
 
 export async function removeWorktree(worktreePath: string): Promise<void> {
-  const repoRoot = await getMainRepoRoot();
-
-  // Unlock the worktree before removal (it was locked during creation)
-  await exec("git", ["worktree", "unlock", worktreePath], { cwd: repoRoot }).catch(() => {});
-
-  // Remove node_modules symlink/junction BEFORE removing worktree.
+  // Remove node_modules symlink/junction BEFORE removing clone directory.
   // On Windows, rm -rf follows junctions and deletes the target.
   try {
     const nmPath = join(worktreePath, "node_modules");
     const { lstat, unlink } = await import("node:fs/promises");
     const stat = await lstat(nmPath);
     if (stat.isSymbolicLink() || stat.isDirectory()) {
-      // unlink removes the junction/symlink without following it
       await unlink(nmPath).catch(() => {});
     }
   } catch {
     // No symlink to remove
   }
 
-  try {
-    await exec("git", ["worktree", "remove", worktreePath, "--force"], {
-      cwd: repoRoot,
-    });
-  } catch {
-    // Fallback: remove directory manually and prune
-    await rm(worktreePath, { recursive: true, force: true });
-    await exec("git", ["worktree", "prune"], { cwd: repoRoot });
-  }
+  // Since we use clones (not worktrees), just delete the directory.
+  await rm(worktreePath, { recursive: true, force: true });
 }
 
 export async function getDiff(worktreePath: string): Promise<string> {
   const absPath = resolve(worktreePath);
   try {
-    // Verify worktree .git file AND its metadata directory still exist.
-    // git gc --auto can prune .git/worktrees/NAME/ even if the .git pointer file remains.
-    await access(join(absPath, ".git"));
-    const gitContent = await readFile(join(absPath, ".git"), "utf-8");
-    const gitdirMatch = gitContent.match(/gitdir:\s*(.+)/);
-    if (gitdirMatch?.[1]) {
-      await access(gitdirMatch[1].trim());
-    }
-
     await exec("git", ["add", "-A"], { cwd: absPath });
     await exec("git", ["reset", "HEAD", "--", "node_modules"], { cwd: absPath }).catch(() => {});
     const { stdout } = await exec("git", ["diff", "--cached", "HEAD"], { cwd: absPath });
@@ -113,12 +88,6 @@ export async function getDiffStats(
 ): Promise<{ filesChanged: string[]; linesAdded: number; linesRemoved: number }> {
   const absPath = resolve(worktreePath);
   try {
-    await access(join(absPath, ".git"));
-    const gitContent = await readFile(join(absPath, ".git"), "utf-8");
-    const gitdirMatch = gitContent.match(/gitdir:\s*(.+)/);
-    if (gitdirMatch?.[1]) {
-      await access(gitdirMatch[1].trim());
-    }
     await exec("git", ["add", "-A"], { cwd: absPath });
     await exec("git", ["reset", "HEAD", "--", "node_modules"], { cwd: absPath }).catch(() => {});
     const { stdout } = await exec("git", ["diff", "--cached", "--stat", "HEAD"], {
@@ -167,16 +136,7 @@ export async function estimateRepoSize(): Promise<number> {
 }
 
 export async function cleanupBranches(): Promise<void> {
-  const repoRoot = await getMainRepoRoot();
-  const { stdout } = await exec("git", ["branch", "--list", "thinktank/*"], {
-    cwd: repoRoot,
-  });
-  for (const branch of stdout.split("\n").filter(Boolean)) {
-    const name = branch.trim();
-    try {
-      await exec("git", ["branch", "-D", name], { cwd: repoRoot });
-    } catch {
-      // ignore
-    }
-  }
+  // With clone-based isolation (instead of worktrees), there are no
+  // thinktank/* branches in the main repo. This function remains for
+  // backward compatibility but is now a no-op.
 }
