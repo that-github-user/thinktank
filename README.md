@@ -143,9 +143,14 @@ Run N parallel agents on a task.
 | `--threshold <number>` | Convergence clustering similarity threshold, 0.0–1.0 (default: 0.3) |
 | `--whitespace-insensitive` | Ignore whitespace in convergence comparison |
 | `--retry` | Re-run only failed/timed-out agents from the last run |
-| `--output-format <fmt>` | Output format: `text` (default) or `json` |
+| `--no-timeout` | Disable agent timeout entirely |
+| `--output-format <fmt>` | Output format: `text` (default), `json`, or `diff` |
 | `--no-color` | Disable colored output |
 | `--verbose` | Show detailed agent output |
+
+### `thinktank init`
+
+Set up thinktank in the current project — checks prerequisites and detects your test command.
 
 ### `thinktank apply`
 
