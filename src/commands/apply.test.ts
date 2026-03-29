@@ -1,5 +1,60 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { parseApplyConflicts } from "./apply.js";
+
+describe("parseApplyConflicts", () => {
+  it("parses conflicted files from 3way output", () => {
+    const stderr = [
+      "error: patch failed: src/cli.ts:10",
+      "Falling back to three-way merge...",
+      "Applied patch to 'src/cli.ts' with conflicts.",
+    ].join("\n");
+    const info = parseApplyConflicts(stderr);
+    assert.deepEqual(info.conflictedFiles, ["src/cli.ts"]);
+    assert.deepEqual(info.appliedFiles, []);
+  });
+
+  it("parses mixed applied and conflicted files", () => {
+    const stderr = [
+      "Applied patch to 'src/utils/git.ts' cleanly.",
+      "error: patch failed: src/cli.ts:10",
+      "Falling back to three-way merge...",
+      "Applied patch to 'src/cli.ts' with conflicts.",
+      "Applied patch to 'src/types.ts' cleanly.",
+    ].join("\n");
+    const info = parseApplyConflicts(stderr);
+    assert.deepEqual(info.appliedFiles, ["src/utils/git.ts", "src/types.ts"]);
+    assert.deepEqual(info.conflictedFiles, ["src/cli.ts"]);
+  });
+
+  it("returns empty arrays for unparseable stderr", () => {
+    const info = parseApplyConflicts("fatal: something unexpected");
+    assert.deepEqual(info.appliedFiles, []);
+    assert.deepEqual(info.conflictedFiles, []);
+  });
+
+  it("returns empty arrays for empty string", () => {
+    const info = parseApplyConflicts("");
+    assert.deepEqual(info.appliedFiles, []);
+    assert.deepEqual(info.conflictedFiles, []);
+  });
+
+  it("deduplicates conflicted files from error + Applied lines", () => {
+    const stderr = [
+      "error: patch failed: src/foo.ts:5",
+      "Applied patch to 'src/foo.ts' with conflicts.",
+    ].join("\n");
+    const info = parseApplyConflicts(stderr);
+    assert.deepEqual(info.conflictedFiles, ["src/foo.ts"]);
+  });
+
+  it("captures error-only failures without Applied line", () => {
+    const stderr = "error: patch failed: src/bar.ts:1\n";
+    const info = parseApplyConflicts(stderr);
+    assert.deepEqual(info.conflictedFiles, ["src/bar.ts"]);
+    assert.deepEqual(info.appliedFiles, []);
+  });
+});
 
 // Test the logic of agent selection without actually running git commands
 describe("apply agent selection logic", () => {
