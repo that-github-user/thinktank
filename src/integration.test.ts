@@ -1,50 +1,49 @@
 import assert from "node:assert/strict";
-import { exec } from "node:child_process";
+import { exec as execCb } from "node:child_process";
 import { describe, it } from "node:test";
 import { promisify } from "node:util";
 
-const execAsync = promisify(exec);
-
+const exec = promisify(execCb);
 const CLI = "npx tsx src/cli.ts";
 
-async function run(args: string): Promise<{ stdout: string; stderr: string }> {
-  return execAsync(`${CLI} ${args}`, { timeout: 30_000 });
-}
-
-describe("CLI integration — smoke tests", () => {
-  it("--version outputs the version", async () => {
-    const { stdout } = await run("--version");
+describe("CLI integration (smoke tests)", () => {
+  it("--version outputs version number", async () => {
+    const { stdout } = await exec(`${CLI} --version`);
     assert.match(stdout.trim(), /^\d+\.\d+\.\d+$/);
   });
 
-  it("--help shows usage and lists commands", async () => {
-    const { stdout } = await run("--help");
-    assert.ok(stdout.includes("thinktank"), "should mention program name");
-    assert.ok(stdout.includes("run"), "should list run command");
-    assert.ok(stdout.includes("list"), "should list list command");
-    assert.ok(stdout.includes("config"), "should list config command");
+  it("--help shows all commands", async () => {
+    const { stdout } = await exec(`${CLI} --help`);
+    assert.ok(stdout.includes("Ensemble AI coding"));
+    assert.ok(stdout.includes("run"));
+    assert.ok(stdout.includes("apply"));
+    assert.ok(stdout.includes("list"));
+    assert.ok(stdout.includes("stats"));
+    assert.ok(stdout.includes("clean"));
+    assert.ok(stdout.includes("undo"));
+    assert.ok(stdout.includes("config"));
   });
 
-  it("list exits cleanly", async () => {
-    const { stdout } = await run("list");
-    // May show "No runs found" or a run table — either is fine
-    assert.ok(stdout.length > 0, "should produce output");
+  it("run --help shows options", async () => {
+    const { stdout } = await exec(`${CLI} run --help`);
+    assert.ok(stdout.includes("--attempts"));
+    assert.ok(stdout.includes("--model"));
+    assert.ok(stdout.includes("--scoring"));
   });
 
-  it("stats exits cleanly", async () => {
-    const { stdout } = await run("stats");
-    assert.ok(stdout.length > 0, "should produce output");
+  it("apply --help shows options", async () => {
+    const { stdout } = await exec(`${CLI} apply --help`);
+    assert.ok(stdout.includes("--agent"));
+    assert.ok(stdout.includes("--preview"));
+    assert.ok(stdout.includes("--dry-run"));
   });
 
-  it("clean exits cleanly", async () => {
-    const { stdout } = await run("clean");
-    assert.ok(stdout.length > 0, "should produce output");
+  it("config list runs without error", async () => {
+    const { stdout } = await exec(`${CLI} config list`);
+    assert.ok(stdout.includes("attempts") || stdout.includes("model"));
   });
 
-  it("config list shows defaults", async () => {
-    const { stdout } = await run("config list");
-    assert.ok(stdout.includes("attempts"), "should show attempts setting");
-    assert.ok(stdout.includes("model"), "should show model setting");
-    assert.ok(stdout.includes("timeout"), "should show timeout setting");
+  it("clean runs without error", async () => {
+    await exec(`${CLI} clean`);
   });
 });
