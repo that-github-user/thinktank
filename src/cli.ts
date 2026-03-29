@@ -6,6 +6,7 @@ import { clean } from "./commands/clean.js";
 import { compare } from "./commands/compare.js";
 import { type ConfigAction, config } from "./commands/config.js";
 import { evaluate } from "./commands/evaluate.js";
+import { init } from "./commands/init.js";
 import { list } from "./commands/list.js";
 import { retry, run } from "./commands/run.js";
 import { stats } from "./commands/stats.js";
@@ -155,6 +156,13 @@ program
       preview: opts.preview ?? false,
       dryRun: opts.dryRun ?? false,
     });
+  });
+
+program
+  .command("init")
+  .description("Set up thinktank in the current project (checks prereqs, detects test command)")
+  .action(async () => {
+    await init();
   });
 
 program
