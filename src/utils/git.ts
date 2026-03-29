@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 
 const exec = promisify(execFile);
@@ -75,21 +75,19 @@ export async function removeWorktree(worktreePath: string): Promise<void> {
 }
 
 export async function getDiff(worktreePath: string): Promise<string> {
+  const absPath = resolve(worktreePath);
   try {
-    // Include both staged and unstaged changes relative to HEAD
-    // Exclude node_modules symlink (created by createWorktree for tool access)
-    await exec("git", ["add", "-A"], { cwd: worktreePath });
-    // Unstage node_modules symlink if it got picked up (created by createWorktree)
-    await exec("git", ["reset", "HEAD", "--", "node_modules"], { cwd: worktreePath }).catch(
-      () => {},
-    );
-    const { stdout } = await exec("git", ["diff", "--cached", "HEAD"], {
-      cwd: worktreePath,
-    });
+    // Verify worktree is still a git repo before running git commands
+    await access(join(absPath, ".git"));
+    await exec("git", ["rev-parse", "--git-dir"], { cwd: absPath });
+
+    await exec("git", ["add", "-A"], { cwd: absPath });
+    await exec("git", ["reset", "HEAD", "--", "node_modules"], { cwd: absPath }).catch(() => {});
+    const { stdout } = await exec("git", ["diff", "--cached", "HEAD"], { cwd: absPath });
     return stdout;
   } catch (err) {
     console.warn(
-      `[thinktank] getDiff failed for worktree ${worktreePath}: ${err instanceof Error ? err.message : String(err)}`,
+      `[thinktank] getDiff failed for ${absPath}: ${err instanceof Error ? err.message : String(err)}`,
     );
     return "";
   }
@@ -98,14 +96,13 @@ export async function getDiff(worktreePath: string): Promise<string> {
 export async function getDiffStats(
   worktreePath: string,
 ): Promise<{ filesChanged: string[]; linesAdded: number; linesRemoved: number }> {
+  const absPath = resolve(worktreePath);
   try {
-    await exec("git", ["add", "-A"], { cwd: worktreePath });
-    // Unstage node_modules symlink if it got picked up (created by createWorktree)
-    await exec("git", ["reset", "HEAD", "--", "node_modules"], { cwd: worktreePath }).catch(
-      () => {},
-    );
+    await access(join(absPath, ".git"));
+    await exec("git", ["add", "-A"], { cwd: absPath });
+    await exec("git", ["reset", "HEAD", "--", "node_modules"], { cwd: absPath }).catch(() => {});
     const { stdout } = await exec("git", ["diff", "--cached", "--stat", "HEAD"], {
-      cwd: worktreePath,
+      cwd: absPath,
     });
 
     const filesChanged: string[] = [];
@@ -126,7 +123,7 @@ export async function getDiffStats(
     return { filesChanged, linesAdded, linesRemoved };
   } catch (err) {
     console.warn(
-      `[thinktank] getDiffStats failed for worktree ${worktreePath}: ${err instanceof Error ? err.message : String(err)}`,
+      `[thinktank] getDiffStats failed for ${absPath}: ${err instanceof Error ? err.message : String(err)}`,
     );
     return { filesChanged: [], linesAdded: 0, linesRemoved: 0 };
   }
