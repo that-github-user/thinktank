@@ -26,10 +26,11 @@ Run N parallel Claude Code agents on the same task, then select the best result 
 ## Quick start
 
 ```bash
-# Install from source (npm package coming soon)
-git clone https://github.com/that-github-user/thinktank.git
-cd thinktank && npm install && npm run build
-npm link  # makes `thinktank` available globally
+# Install globally
+npm install -g thinktank-ai
+
+# Or run without installing
+npx thinktank-ai run "fix the authentication bypass"
 
 # Run 3 parallel agents on a task
 thinktank run "fix the authentication bypass"
