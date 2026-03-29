@@ -1,10 +1,10 @@
-import { execFile } from "node:child_process";
+import { exec as execCb } from "node:child_process";
 import { access } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import type { TestResult } from "../types.js";
 
-const exec = promisify(execFile);
+const exec = promisify(execCb);
 
 const DEFAULT_TEST_TIMEOUT_MS = 120_000;
 
@@ -65,7 +65,7 @@ export async function runTests(
     };
   }
 
-  const { cmd, args } = parseTestCommand(testCmd);
+  const { cmd } = parseTestCommand(testCmd);
 
   if (!cmd) {
     return {
@@ -88,12 +88,12 @@ export async function runTests(
   }
 
   try {
-    // Use execFile with shell:true for cross-platform command resolution
-    // while keeping args as an array to prevent injection via arguments.
-    const { stdout, stderr } = await exec(cmd, args, {
+    // Use exec (shell string) for cross-platform command resolution (npx, npm, etc.).
+    // Safety: testCmd is validated by validateTestCommand() which rejects shell operators.
+    // This avoids the DEP0190 deprecation from execFile + shell:true + args array.
+    const { stdout, stderr } = await exec(testCmd, {
       cwd: worktreePath,
       timeout: timeoutMs,
-      shell: true,
       env: { ...process.env, CI: "true" },
     });
     return {
@@ -117,15 +117,6 @@ export async function runTests(
         passed: false,
         output: `Test command timed out after ${timeoutMs / 1000}s`,
         exitCode: 124,
-      };
-    }
-
-    if (typeof e.code === "string" && e.code === "ENOENT") {
-      return {
-        agentId,
-        passed: false,
-        output: `Command not found: ${cmd}. Is it installed?`,
-        exitCode: 127,
       };
     }
 

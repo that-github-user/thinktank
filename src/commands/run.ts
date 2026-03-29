@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { exec as execCb, execFile } from "node:child_process";
 import { mkdir, readFile, statfs, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -322,14 +322,14 @@ export async function retry(opts: RunOptions): Promise<void> {
  * Returns a warning string if the tests fail, or null if they pass.
  */
 export async function preflightTestRun(testCmd: string, repoRoot: string): Promise<string | null> {
-  const { cmd, args } = parseTestCommand(testCmd);
+  const { cmd } = parseTestCommand(testCmd);
   if (!cmd) return null;
 
+  const execAsync = promisify(execCb);
   try {
-    await execFileAsync(cmd, args, {
+    await execAsync(testCmd, {
       cwd: repoRoot,
       timeout: 60_000,
-      shell: true,
       env: { ...process.env, CI: "true" },
     });
     return null;
