@@ -194,8 +194,17 @@ program
 program
   .command("stats")
   .description("Show aggregate statistics across all thinktank runs")
-  .action(async () => {
-    await stats();
+  .option("--model <name>", "Filter to runs using the specified model")
+  .option("--since <date>", "Show only runs from this date onward (ISO 8601)")
+  .option("--until <date>", "Show only runs up to this date (ISO 8601)")
+  .option("--passed-only", "Show only runs where at least one agent passed tests")
+  .action(async (opts) => {
+    await stats({
+      model: opts.model,
+      since: opts.since,
+      until: opts.until,
+      passedOnly: opts.passedOnly,
+    });
   });
 
 program
