@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { AgentResult } from "../types.js";
 import { getDiff, getDiffStats } from "../utils/git.js";
 import type { Runner, RunnerOptions } from "./base.js";
@@ -19,6 +21,17 @@ export const claudeCodeRunner: Runner = {
 
   async run(id: number, opts: RunnerOptions): Promise<AgentResult> {
     const start = Date.now();
+
+    // Backup the .git pointer file. Agents can delete it via Bash/Write tools.
+    // The lock (in createWorktree) protects the metadata directory in .git/worktrees/,
+    // but we also need to restore the pointer file if the agent removed it.
+    const gitFilePath = join(opts.worktreePath, ".git");
+    let gitFileBackup: string | null = null;
+    try {
+      gitFileBackup = await readFile(gitFilePath, "utf-8");
+    } catch {
+      // Not a worktree or .git is a directory
+    }
 
     return new Promise((resolve) => {
       let output = "";
@@ -93,6 +106,17 @@ export const claudeCodeRunner: Runner = {
         clearTimeout(timer);
         if (settled) return;
         settled = true;
+
+        // Restore .git pointer file if the agent deleted it during execution.
+        // The worktree lock protects .git/worktrees/NAME/ from gc pruning,
+        // but the agent can still delete the .git file in its own directory.
+        if (gitFileBackup) {
+          try {
+            await readFile(gitFilePath, "utf-8");
+          } catch {
+            await writeFile(gitFilePath, gitFileBackup).catch(() => {});
+          }
+        }
 
         const duration = Date.now() - start;
         const diff = await getDiff(opts.worktreePath);
