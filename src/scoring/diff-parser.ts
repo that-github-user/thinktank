@@ -54,11 +54,23 @@ export function parseDiff(diff: string): DiffFile[] {
   return files;
 }
 
+function normalizeLine(line: string, whitespaceInsensitive: boolean): string {
+  const trimmed = line.trim();
+  return whitespaceInsensitive ? trimmed.replace(/\s+/g, " ") : trimmed;
+}
+
 /**
  * Compute similarity between two diffs using Jaccard similarity
  * on the set of added lines. Returns 0-1 where 1 = identical changes.
+ *
+ * When whitespaceInsensitive is true, interior whitespace is collapsed
+ * before comparison so formatting-only differences don't lower scores.
  */
-export function diffSimilarity(diffA: string, diffB: string): number {
+export function diffSimilarity(
+  diffA: string,
+  diffB: string,
+  whitespaceInsensitive = false,
+): number {
   const filesA = parseDiff(diffA);
   const filesB = parseDiff(diffB);
 
@@ -68,12 +80,12 @@ export function diffSimilarity(diffA: string, diffB: string): number {
 
   for (const f of filesA) {
     for (const line of f.addedLines) {
-      setA.add(`${f.path}:${line.trim()}`);
+      setA.add(`${f.path}:${normalizeLine(line, whitespaceInsensitive)}`);
     }
   }
   for (const f of filesB) {
     for (const line of f.addedLines) {
-      setB.add(`${f.path}:${line.trim()}`);
+      setB.add(`${f.path}:${normalizeLine(line, whitespaceInsensitive)}`);
     }
   }
 
@@ -95,6 +107,7 @@ export function diffSimilarity(diffA: string, diffB: string): number {
  */
 export function pairwiseSimilarity(
   agents: Array<{ id: number; diff: string }>,
+  whitespaceInsensitive = false,
 ): Map<string, number> {
   const matrix = new Map<string, number>();
 
@@ -102,7 +115,7 @@ export function pairwiseSimilarity(
     for (let j = i + 1; j < agents.length; j++) {
       const a = agents[i]!;
       const b = agents[j]!;
-      const sim = diffSimilarity(a.diff, b.diff);
+      const sim = diffSimilarity(a.diff, b.diff, whitespaceInsensitive);
       matrix.set(`${a.id}-${b.id}`, sim);
     }
   }

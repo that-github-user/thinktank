@@ -48,6 +48,7 @@ program
   .option("--no-color", "Disable colored output")
   .option("--output-format <format>", "Output format: text (default) or json", "text")
   .option("--verbose", "Show detailed output from each agent")
+  .option("--whitespace-insensitive", "Ignore whitespace differences in convergence comparison")
   .option("--retry", "Re-run only failed/timed-out agents from the last run")
   .action(async (promptArg: string | undefined, opts) => {
     const testTimeout = parseInt(opts.testTimeout, 10);
@@ -100,6 +101,7 @@ program
         verbose: opts.verbose ?? false,
         outputFormat: opts.outputFormat,
         retry: true,
+        whitespaceInsensitive: opts.whitespaceInsensitive ?? false,
       });
       return;
     }
@@ -131,6 +133,7 @@ program
       scoring: opts.scoring,
       verbose: opts.verbose ?? false,
       outputFormat: opts.outputFormat,
+      whitespaceInsensitive: opts.whitespaceInsensitive ?? false,
     });
   });
 
