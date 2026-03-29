@@ -38,9 +38,15 @@ export const claudeCodeRunner: Runner = {
       let error = "";
       let settled = false;
 
+      // Append worktree constraint to prompt to prevent agents from escaping
+      const constrainedPrompt =
+        `${opts.prompt}\n\nIMPORTANT: Work ONLY in the current directory (${opts.worktreePath}). ` +
+        "Do NOT cd to other directories. Do NOT run git worktree, git init, or thinktank commands. " +
+        "All your changes must be made in the current working directory.";
+
       const args = [
         "-p",
-        opts.prompt,
+        constrainedPrompt,
         "--output-format",
         "text",
         "--model",
