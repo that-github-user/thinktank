@@ -1,11 +1,51 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, statfs, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getDefaultRunner, getRunner } from "../runners/registry.js";
 import { analyzeConvergence, copelandRecommend, recommend } from "../scoring/convergence.js";
 import { runTests, validateTestCommand } from "../scoring/test-runner.js";
 import type { AgentResult, EnsembleResult, RunOptions } from "../types.js";
 import { displayApplyInstructions, displayHeader, displayResults } from "../utils/display.js";
-import { cleanupBranches, createWorktree, getRepoRoot, removeWorktree } from "../utils/git.js";
+import {
+  cleanupBranches,
+  createWorktree,
+  estimateRepoSize,
+  getRepoRoot,
+  removeWorktree,
+} from "../utils/git.js";
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+}
+
+/**
+ * Check whether the temp partition has enough free space for the planned worktrees.
+ * Returns a warning string if space is low, or null if OK.
+ */
+export async function checkDiskSpace(attempts: number): Promise<string | null> {
+  try {
+    const tempDir = tmpdir();
+    const stats = await statfs(tempDir);
+    const availableBytes = stats.bavail * stats.bsize;
+
+    const repoSize = await estimateRepoSize();
+    const estimatedNeed = repoSize * attempts;
+
+    if (availableBytes < estimatedNeed) {
+      return (
+        `Low disk space on temp partition: ${formatBytes(availableBytes)} available, ` +
+        `~${formatBytes(estimatedNeed)} needed for ${attempts} worktrees. ` +
+        "Consider freeing disk space or reducing --attempts."
+      );
+    }
+  } catch {
+    // statfs or estimateRepoSize failed — skip the check silently
+  }
+  return null;
+}
 
 /**
  * Pre-flight validation before spawning agents.
@@ -25,6 +65,12 @@ export async function preflightValidation(opts: RunOptions): Promise<string | nu
     if (testError) {
       return `Invalid --test-cmd: ${testError}`;
     }
+  }
+
+  // Check: disk space (warn only, do not block)
+  const diskWarning = await checkDiskSpace(opts.attempts);
+  if (diskWarning) {
+    console.warn(`  ⚠ ${diskWarning}`);
   }
 
   return null;

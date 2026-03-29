@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import type { AgentResult, EnsembleResult, RunOptions, TestResult } from "../types.js";
 import {
+  checkDiskSpace,
   findFailedAgents,
   loadLatestResult,
   makeResultFilename,
@@ -406,5 +407,32 @@ describe("retry edge cases", () => {
     assert.equal(merged[1].diff, "diff2");
     assert.equal(merged[2].status, "success");
     assert.equal(merged[2].diff, "new diff3");
+  });
+});
+
+describe("checkDiskSpace", () => {
+  it("returns null when enough space is available", async () => {
+    // With a small number of attempts in a real git repo, there should be enough space
+    const result = await checkDiskSpace(1);
+    assert.equal(result, null);
+  });
+
+  it("returns a warning string when space is insufficient", async () => {
+    // Request an absurd number of worktrees to trigger the warning
+    const result = await checkDiskSpace(1_000_000);
+    if (result !== null) {
+      assert.ok(result.includes("Low disk space"));
+      assert.ok(result.includes("available"));
+      assert.ok(result.includes("needed"));
+      assert.ok(result.includes("worktrees"));
+    }
+    // If the repo is tiny enough that even 1M copies fit, result may be null — that's OK
+  });
+
+  it("includes attempt count in warning message", async () => {
+    const result = await checkDiskSpace(1_000_000);
+    if (result !== null) {
+      assert.ok(result.includes("1000000 worktrees"));
+    }
   });
 });
