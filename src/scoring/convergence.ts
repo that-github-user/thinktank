@@ -177,9 +177,39 @@ export function recommend(
   return { recommended: bestId, scores: agentScores };
 }
 
+const TEST_FILE_PATTERN = /[./](?:test|spec)\./;
+
+/** Cap for test file criterion — prevents gaming with many test files */
+const TEST_FILE_CAP = 3;
+
+/**
+ * Count test files (matching *.test.* or *.spec.*) and non-test files separately.
+ */
+function splitFilesByType(files: string[]): { testFiles: number; nonTestFiles: number } {
+  let testFiles = 0;
+  let nonTestFiles = 0;
+  for (const f of files) {
+    if (TEST_FILE_PATTERN.test(f)) {
+      testFiles++;
+    } else {
+      nonTestFiles++;
+    }
+  }
+  return { testFiles, nonTestFiles };
+}
+
+/**
+ * Effective test file count for scoring: capped at TEST_FILE_CAP, and only
+ * counts when the agent also changed non-test files (prevents gaming).
+ */
+function effectiveTestFiles(testFiles: number, nonTestFiles: number): number {
+  if (nonTestFiles === 0) return 0;
+  return Math.min(testFiles, TEST_FILE_CAP);
+}
+
 /**
  * Copeland pairwise scoring: compare every pair of agents head-to-head
- * on three criteria (tests passed, convergence group size, files changed).
+ * on four criteria (tests passed, convergence group size, non-test files changed, test files).
  * For each pair, the agent winning more criteria gets +1, the loser gets -1, ties get 0.
  * The agent with the highest Copeland score is recommended.
  */
@@ -197,8 +227,9 @@ export function copelandRecommend(
     const testsPassed = test?.passed ? 1 : 0;
     const group = convergence.find((g) => g.agents.includes(agent.id));
     const groupSize = group ? group.agents.length : 0;
-    const filesChanged = agent.filesChanged.length;
-    return { id: agent.id, testsPassed, groupSize, filesChanged };
+    const { testFiles, nonTestFiles } = splitFilesByType(agent.filesChanged);
+    const cappedTestFiles = effectiveTestFiles(testFiles, nonTestFiles);
+    return { id: agent.id, testsPassed, groupSize, nonTestFiles, cappedTestFiles };
   });
 
   // Initialize scores
@@ -208,7 +239,8 @@ export function copelandRecommend(
       agentId: data.id,
       testsWins: 0,
       convergenceWins: 0,
-      filesChangedWins: 0,
+      nonTestFilesWins: 0,
+      testFilesWins: 0,
       copelandTotal: 0,
     });
   }
@@ -244,15 +276,26 @@ export function copelandRecommend(
         scoreMap.get(a.id)!.convergenceWins--;
       }
 
-      // Criterion 3: files changed (fewer is better — minimal changes preferred)
-      if (a.filesChanged < b.filesChanged) {
+      // Criterion 3: non-test files changed (fewer is better — minimal code scope)
+      if (a.nonTestFiles < b.nonTestFiles) {
         aWins++;
-        scoreMap.get(a.id)!.filesChangedWins++;
-        scoreMap.get(b.id)!.filesChangedWins--;
-      } else if (b.filesChanged < a.filesChanged) {
+        scoreMap.get(a.id)!.nonTestFilesWins++;
+        scoreMap.get(b.id)!.nonTestFilesWins--;
+      } else if (b.nonTestFiles < a.nonTestFiles) {
         bWins++;
-        scoreMap.get(b.id)!.filesChangedWins++;
-        scoreMap.get(a.id)!.filesChangedWins--;
+        scoreMap.get(b.id)!.nonTestFilesWins++;
+        scoreMap.get(a.id)!.nonTestFilesWins--;
+      }
+
+      // Criterion 4: test files added/modified (more is better, capped, only with prod changes)
+      if (a.cappedTestFiles > b.cappedTestFiles) {
+        aWins++;
+        scoreMap.get(a.id)!.testFilesWins++;
+        scoreMap.get(b.id)!.testFilesWins--;
+      } else if (b.cappedTestFiles > a.cappedTestFiles) {
+        bWins++;
+        scoreMap.get(b.id)!.testFilesWins++;
+        scoreMap.get(a.id)!.testFilesWins--;
       }
 
       // Overall Copeland: winner of more criteria gets +1, loser -1

@@ -119,13 +119,20 @@ The agent with the highest total score is recommended. Ties broken by the first 
 
 ### Copeland Pairwise Scoring (alternative)
 
-Enabled with `--scoring copeland`. Instead of assigning absolute point values, Copeland scoring compares every pair of agents head-to-head on three criteria:
+Enabled with `--scoring copeland`. Instead of assigning absolute point values, Copeland scoring compares every pair of agents head-to-head on four criteria:
 
-| Criterion | Better = |
-|-----------|----------|
-| Tests passed | Passed > Failed |
-| Convergence group size | Larger group > Smaller group |
-| Files changed | Fewer files > More files |
+| Criterion | Better = | Notes |
+|-----------|----------|-------|
+| Tests passed | Passed > Failed | |
+| Convergence group size | Larger group > Smaller group | |
+| Non-test files changed | Fewer files > More files | Minimal code scope preferred |
+| Test files added/modified | More files > Fewer files | Capped at 3; only counts when agent also changed non-test files |
+
+Test files are identified by the `*.test.*` or `*.spec.*` pattern in the file path.
+
+**Anti-gaming:** The test files criterion only applies when the agent also changed production (non-test) code. An agent that only adds test files without changing production code receives no test coverage bonus — this prevents gaming the score with empty test padding.
+
+**Cap:** The effective test file count is `min(testFiles, 3)`. This means 1 test file < 2 < 3+, but 3 and 10 are treated equally — adequate coverage is rewarded, but excessive test files don't dominate.
 
 For each pair (A, B):
 1. Count how many criteria A wins vs B wins
