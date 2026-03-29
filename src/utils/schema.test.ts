@@ -84,9 +84,15 @@ describe("validateResult", () => {
     assert.match(validateResult(result)!, /scoring/);
   });
 
-  it("rejects missing scoring", () => {
+  it("accepts missing scoring (backward compat — defaults to weighted)", () => {
     const result = makeValidResult();
     delete result.scoring;
+    assert.equal(validateResult(result), null);
+  });
+
+  it("rejects invalid scoring value", () => {
+    const result = makeValidResult();
+    result.scoring = "invalid";
     assert.match(validateResult(result)!, /scoring/);
   });
 
@@ -126,10 +132,10 @@ describe("validateResult", () => {
     assert.match(validateResult(result)!, /recommended/);
   });
 
-  it("rejects missing scores", () => {
+  it("accepts missing scores (backward compat)", () => {
     const result = makeValidResult();
     delete result.scores;
-    assert.match(validateResult(result)!, /scores/);
+    assert.equal(validateResult(result), null);
   });
 
   it("rejects non-array scores", () => {
