@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import pc from "picocolors";
 import type { EnsembleResult } from "../types.js";
+import { parseAndValidateResult } from "../utils/schema.js";
 
 export interface StatsOptions {
   model?: string;
@@ -62,9 +63,9 @@ export async function stats(opts: StatsOptions = {}): Promise<void> {
   for (const file of files) {
     try {
       const raw = await readFile(join(".thinktank", file), "utf-8");
-      allResults.push(JSON.parse(raw) as EnsembleResult);
-    } catch {
-      // skip malformed files
+      allResults.push(parseAndValidateResult(raw, file));
+    } catch (err) {
+      console.warn(`  Skipping ${file}: ${(err as Error).message}`);
     }
   }
 

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import pc from "picocolors";
 import { analyzeConvergence, copelandRecommend, recommend } from "../scoring/convergence.js";
 import type { EnsembleResult } from "../types.js";
+import { parseAndValidateResult } from "../utils/schema.js";
 
 interface RunEvaluation {
   file: string;
@@ -83,9 +84,9 @@ export async function evaluate(): Promise<void> {
   for (const file of files) {
     try {
       const raw = await readFile(join(".thinktank", file), "utf-8");
-      runs.push(JSON.parse(raw) as EnsembleResult);
-    } catch {
-      // skip malformed
+      runs.push(parseAndValidateResult(raw, file));
+    } catch (err) {
+      console.warn(`  Skipping ${file}: ${(err as Error).message}`);
     }
   }
 
