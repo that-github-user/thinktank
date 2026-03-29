@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import pc from "picocolors";
 import type { EnsembleResult } from "../types.js";
 import { cleanupBranches, getRepoRoot, removeWorktree } from "../utils/git.js";
+import { parseAndValidateResult } from "../utils/schema.js";
 
 const exec = promisify(execFile);
 
@@ -71,9 +72,15 @@ export async function apply(opts: ApplyOptions): Promise<void> {
   let result: EnsembleResult;
   try {
     const raw = await readFile(join(".thinktank", "latest.json"), "utf-8");
-    result = JSON.parse(raw);
-  } catch {
-    console.error("  No results found. Run `thinktank run` first.");
+    result = parseAndValidateResult(raw, "latest.json");
+  } catch (err) {
+    const msg = (err as Error).message;
+    if (msg.includes("Invalid result file")) {
+      console.error(`  ${msg}`);
+      console.error("  The result file may be corrupted. Try running `thinktank run` again.");
+    } else {
+      console.error("  No results found. Run `thinktank run` first.");
+    }
     process.exit(1);
   }
 

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import pc from "picocolors";
 import type { EnsembleResult } from "../types.js";
 import { displayResults, padRight } from "../utils/display.js";
+import { parseAndValidateResult } from "../utils/schema.js";
 
 export interface RunSummary {
   runNumber: number;
@@ -48,9 +49,9 @@ export async function loadAllRuns(): Promise<{ filename: string; result: Ensembl
   for (const file of files) {
     try {
       const raw = await readFile(join(".thinktank", file), "utf-8");
-      runs.push({ filename: file, result: JSON.parse(raw) as EnsembleResult });
-    } catch {
-      // skip malformed files
+      runs.push({ filename: file, result: parseAndValidateResult(raw, file) });
+    } catch (err) {
+      console.warn(`  Skipping ${file}: ${(err as Error).message}`);
     }
   }
   return runs;
