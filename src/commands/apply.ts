@@ -8,6 +8,36 @@ import { cleanupBranches, getRepoRoot, removeWorktree } from "../utils/git.js";
 
 const exec = promisify(execFile);
 
+export interface ConflictInfo {
+  appliedFiles: string[];
+  conflictedFiles: string[];
+}
+
+/** Parse git apply --3way stderr to extract applied/conflicted file lists. */
+export function parseApplyConflicts(stderr: string): ConflictInfo {
+  const conflictedFiles: string[] = [];
+  const appliedFiles: string[] = [];
+  for (const line of stderr.split("\n")) {
+    const patchMatch = line.match(/Applied patch to '([^']+)'/);
+    if (patchMatch) {
+      const file = patchMatch[1];
+      if (line.includes("with conflicts")) {
+        if (!conflictedFiles.includes(file)) {
+          conflictedFiles.push(file);
+        }
+      } else if (!appliedFiles.includes(file)) {
+        appliedFiles.push(file);
+      }
+      continue;
+    }
+    const failMatch = line.match(/^error: patch failed: ([^:]+)/);
+    if (failMatch && !conflictedFiles.includes(failMatch[1])) {
+      conflictedFiles.push(failMatch[1]);
+    }
+  }
+  return { appliedFiles, conflictedFiles };
+}
+
 export interface ApplyOptions {
   agent?: number;
   preview?: boolean;
@@ -112,10 +142,56 @@ export async function apply(opts: ApplyOptions): Promise<void> {
 
     console.log("  Changes applied successfully.");
   } catch (err: unknown) {
-    const e = err as { stderr?: string };
-    console.error("  Failed to apply diff. There may be conflicts.");
-    if (e.stderr) console.error(`  ${e.stderr}`);
-    console.error(`  You can manually inspect the diff at: ${agent.worktree}`);
+    const e = err as { stderr?: string; stdout?: string };
+    const stderr = e.stderr ?? "";
+    const { appliedFiles, conflictedFiles } = parseApplyConflicts(stderr);
+
+    console.error();
+    console.error(pc.bold(pc.red("  Apply failed — conflicts detected")));
+    console.error(pc.dim("  " + "─".repeat(58)));
+    console.error();
+
+    if (appliedFiles.length > 0) {
+      console.error(pc.green("  Applied cleanly:"));
+      for (const f of appliedFiles) {
+        console.error(pc.green(`    ✓ ${f}`));
+      }
+      console.error();
+    }
+
+    if (conflictedFiles.length > 0) {
+      console.error(pc.red("  Conflicted:"));
+      for (const f of conflictedFiles) {
+        console.error(pc.red(`    ✗ ${f}`));
+      }
+      console.error();
+    }
+
+    // If we couldn't parse any files, show the raw stderr
+    if (conflictedFiles.length === 0 && appliedFiles.length === 0 && stderr.trim()) {
+      console.error(pc.dim(`  ${stderr.trim()}`));
+      console.error();
+    }
+
+    const otherAgents = result.agents
+      .filter((a) => a.id !== agentId && a.status === "success" && a.diff)
+      .map((a) => `#${a.id}`);
+
+    console.error("  Next steps:");
+    if (otherAgents.length > 0) {
+      console.error(
+        `    • Try a different agent: thinktank apply --agent ${otherAgents[0].slice(1)}`,
+      );
+    }
+    console.error(`    • Inspect the diff first: thinktank apply --preview --agent ${agentId}`);
+    console.error("    • Manually merge from the worktree:");
+    console.error(pc.dim(`        ${agent.worktree}`));
+    if (conflictedFiles.length > 0 && appliedFiles.length > 0) {
+      console.error("    • Resolve conflict markers in your working tree:");
+      console.error(pc.dim("        git diff   # review conflict markers"));
+      console.error(pc.dim("        git checkout --conflict=merge <file>   # re-create markers"));
+    }
+    console.error();
     process.exit(1);
   }
 
