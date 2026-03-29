@@ -1,6 +1,6 @@
 {
   "name": "thinktank-ai",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Ensemble AI coding — run N parallel Claude Code agents, select the best result via Copeland pairwise scoring",
   "type": "module",
   "bin": {
