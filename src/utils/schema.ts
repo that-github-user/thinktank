@@ -20,8 +20,8 @@ export function validateResult(data: unknown): string | null {
   if (typeof obj.timestamp !== "string") {
     return "missing or invalid field: timestamp (expected string)";
   }
-  if (obj.scoring !== "weighted" && obj.scoring !== "copeland") {
-    return 'missing or invalid field: scoring (expected "weighted" or "copeland")';
+  if (obj.scoring !== undefined && obj.scoring !== "weighted" && obj.scoring !== "copeland") {
+    return 'invalid field: scoring (expected "weighted", "copeland", or omitted)';
   }
   if (!Array.isArray(obj.agents)) {
     return "missing or invalid field: agents (expected array)";
@@ -35,8 +35,8 @@ export function validateResult(data: unknown): string | null {
   if (obj.recommended !== null && typeof obj.recommended !== "number") {
     return "missing or invalid field: recommended (expected number or null)";
   }
-  if (!Array.isArray(obj.scores)) {
-    return "missing or invalid field: scores (expected array)";
+  if (obj.scores !== undefined && !Array.isArray(obj.scores)) {
+    return "invalid field: scores (expected array or omitted)";
   }
 
   return null;
