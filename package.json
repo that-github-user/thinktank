@@ -1,10 +1,18 @@
 {
-  "name": "thinktank",
+  "name": "thinktank-ai",
   "version": "0.1.0",
-  "description": "Ensemble AI coding — run N parallel Claude Code agents, select the best result via consensus + test execution",
+  "description": "Ensemble AI coding — run N parallel Claude Code agents, select the best result via Copeland pairwise scoring",
   "type": "module",
   "bin": {
     "thinktank": "./dist/cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/that-github-user/thinktank.git"
+  },
+  "homepage": "https://github.com/that-github-user/thinktank",
+  "bugs": {
+    "url": "https://github.com/that-github-user/thinktank/issues"
   },
   "scripts": {
     "build": "tsc",
@@ -26,7 +34,9 @@
   "author": "",
   "license": "MIT",
   "files": [
-    "dist",
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "!dist/**/*.test.*",
     "README.md",
     "LICENSE"
   ],
