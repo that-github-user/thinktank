@@ -294,7 +294,8 @@ describe("copelandRecommend", () => {
       assert.equal(score.copelandTotal, 0, `Agent #${score.agentId} should have Copeland score 0`);
       assert.equal(score.testsWins, 0);
       assert.equal(score.convergenceWins, 0);
-      assert.equal(score.filesChangedWins, 0);
+      assert.equal(score.nonTestFilesWins, 0);
+      assert.equal(score.testFilesWins, 0);
     }
     // Still recommends someone (first agent)
     assert.ok(result.recommended !== null);
@@ -317,9 +318,10 @@ describe("copelandRecommend", () => {
     const convergence = analyzeConvergence(agents);
     const result = copelandRecommend(agents, tests, convergence);
 
-    // Agent 1 vs Agent 2: tests(+1), convergence(-1), files(-1) → Agent 2 wins
-    // Agent 1 vs Agent 3: tests(+1), convergence(-1), files(tie) → tie
-    // Agent 2 vs Agent 3: tests(tie), convergence(tie), files(+1 for 2) → Agent 2 wins
+    // No test files in any agent, so testFiles criterion is always tied
+    // Agent 1 vs Agent 2: tests(+1), convergence(-1), scope(-1), testFiles(tie) → Agent 2 wins
+    // Agent 1 vs Agent 3: tests(+1), convergence(-1), scope(tie), testFiles(tie) → tie
+    // Agent 2 vs Agent 3: tests(tie), convergence(tie), scope(+1 for 2), testFiles(tie) → Agent 2 wins
     // So Agent 2 should have the best Copeland score
     assert.equal(result.recommended, 2);
   });
@@ -375,8 +377,8 @@ describe("copelandRecommend", () => {
     // Score1 wins tests and files, score2 wins neither
     assert.equal(score1.testsWins, 1);
     assert.equal(score2.testsWins, -1);
-    assert.equal(score1.filesChangedWins, 1);
-    assert.equal(score2.filesChangedWins, -1);
+    assert.equal(score1.nonTestFilesWins, 1);
+    assert.equal(score2.nonTestFilesWins, -1);
   });
 
   it("handles single agent", () => {
@@ -386,5 +388,103 @@ describe("copelandRecommend", () => {
     assert.equal(result.recommended, 1);
     assert.equal(result.scores.length, 1);
     assert.equal(result.scores[0]!.copelandTotal, 0);
+  });
+
+  it("agent with tests beats agent without when other criteria tie", () => {
+    // Both agents change 1 prod file + 1 test file, same convergence
+    const agents = [
+      makeAgent({ id: 1, diff: DIFF_A, filesChanged: ["a.ts", "a.test.ts"] }),
+      makeAgent({ id: 2, diff: DIFF_A, filesChanged: ["a.ts"] }),
+    ];
+    const tests = [
+      { agentId: 1, passed: true },
+      { agentId: 2, passed: true },
+    ];
+    const convergence = analyzeConvergence(agents);
+    const result = copelandRecommend(agents, tests, convergence);
+
+    // Agent 1 wins testFiles criterion (+1 vs 0), ties everything else
+    assert.equal(result.recommended, 1);
+    const score1 = result.scores.find((s) => s.agentId === 1);
+    assert.ok(score1);
+    assert.ok(score1.testFilesWins > 0);
+  });
+
+  it("test-only changes do not get test file bonus", () => {
+    // Agent 1 changes only test files (no prod code) — should not get testFiles bonus
+    // Agent 2 changes 1 prod file
+    const agents = [
+      makeAgent({ id: 1, diff: DIFF_A, filesChanged: ["a.test.ts", "b.spec.ts"] }),
+      makeAgent({ id: 2, diff: DIFF_B, filesChanged: ["x.ts"] }),
+    ];
+    const convergence = analyzeConvergence(agents);
+    const result = copelandRecommend(agents, [], convergence);
+
+    const score1 = result.scores.find((s) => s.agentId === 1);
+    const score2 = result.scores.find((s) => s.agentId === 2);
+    assert.ok(score1);
+    assert.ok(score2);
+
+    // Agent 1 has 0 effective test files (no prod changes), Agent 2 also has 0 test files
+    // So testFilesWins should be 0 for both
+    assert.equal(score1.testFilesWins, 0);
+    assert.equal(score2.testFilesWins, 0);
+
+    // Agent 1 has 0 nonTestFiles, Agent 2 has 1 — but fewer is better,
+    // so Agent 1 wins scope. However Agent 2 is not disadvantaged on testFiles.
+  });
+
+  it("test file cap prevents gaming with many test files", () => {
+    // Agent 1: 1 prod file + 10 test files
+    // Agent 2: 1 prod file + 2 test files
+    // Agent 3: 1 prod file + 3 test files
+    // After capping at 3: Agent 1 effective=3, Agent 2 effective=2, Agent 3 effective=3
+    const agents = [
+      makeAgent({
+        id: 1,
+        diff: DIFF_A,
+        filesChanged: [
+          "a.ts",
+          "a.test.ts",
+          "b.test.ts",
+          "c.test.ts",
+          "d.test.ts",
+          "e.test.ts",
+          "f.test.ts",
+          "g.test.ts",
+          "h.test.ts",
+          "i.test.ts",
+          "j.test.ts",
+        ],
+      }),
+      makeAgent({
+        id: 2,
+        diff: DIFF_A,
+        filesChanged: ["a.ts", "a.test.ts", "b.test.ts"],
+      }),
+      makeAgent({
+        id: 3,
+        diff: DIFF_A,
+        filesChanged: ["a.ts", "a.test.ts", "b.test.ts", "c.test.ts"],
+      }),
+    ];
+    const convergence = analyzeConvergence(agents);
+    const result = copelandRecommend(agents, [], convergence);
+
+    const score1 = result.scores.find((s) => s.agentId === 1);
+    const score3 = result.scores.find((s) => s.agentId === 3);
+    assert.ok(score1);
+    assert.ok(score3);
+
+    // Agent 1 (10 test files capped to 3) and Agent 3 (3 test files capped to 3)
+    // should tie on testFiles criterion
+    // Agent 1 vs Agent 3: testFilesWins contribution should be 0 (tie)
+    // In pairwise: A1 effective=3 vs A3 effective=3 → tie on testFiles
+    assert.equal(score1.testFilesWins, score3.testFilesWins);
+
+    // Agent 2 (2 test files) should lose to both Agent 1 and Agent 3 on testFiles
+    const score2 = result.scores.find((s) => s.agentId === 2);
+    assert.ok(score2);
+    assert.ok(score2.testFilesWins < score1.testFilesWins);
   });
 });

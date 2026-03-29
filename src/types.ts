@@ -53,7 +53,8 @@ export interface CopelandScore {
   agentId: number;
   testsWins: number;
   convergenceWins: number;
-  filesChangedWins: number;
+  nonTestFilesWins: number;
+  testFilesWins: number;
   copelandTotal: number;
 }
 

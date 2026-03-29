@@ -107,10 +107,11 @@ export function displayResults(result: EnsembleResult): void {
         padRight("Agent", 8) +
         padRight("Tests", 10) +
         padRight("Converge", 10) +
-        padRight("Files", 10) +
+        padRight("Scope", 10) +
+        padRight("TestCov", 10) +
         padRight("Copeland", 10),
     );
-    console.log("  " + pc.dim("─".repeat(48)));
+    console.log("  " + pc.dim("─".repeat(58)));
 
     for (const score of result.copelandScores) {
       const isRecommended = result.scoring === "copeland" && result.recommended === score.agentId;
@@ -121,7 +122,8 @@ export function displayResults(result: EnsembleResult): void {
           padRight(`#${score.agentId}`, 8) +
           padRight(fmt(score.testsWins), 10) +
           padRight(fmt(score.convergenceWins), 10) +
-          padRight(fmt(score.filesChangedWins), 10) +
+          padRight(fmt(score.nonTestFilesWins), 10) +
+          padRight(fmt(score.testFilesWins), 10) +
           padRight(fmt(score.copelandTotal), 10),
       );
     }
@@ -133,7 +135,7 @@ export function displayResults(result: EnsembleResult): void {
     const method = result.scoring === "copeland" ? "Copeland pairwise" : "weighted";
     console.log(
       pc.cyan(`  Recommended: Agent #${result.recommended}`) +
-        pc.dim(` (${method} scoring: tests + convergence + diff size)`),
+        pc.dim(` (${method} scoring: tests + convergence + scope + test coverage)`),
     );
     console.log();
   }
