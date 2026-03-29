@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import { apply } from "./commands/apply.js";
 import { clean } from "./commands/clean.js";
@@ -14,6 +17,10 @@ import { undo } from "./commands/undo.js";
 import { loadConfig } from "./utils/config.js";
 import { resolvePrompt } from "./utils/prompt.js";
 
+// Read version from package.json so it stays in sync automatically
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
+
 const program = new Command();
 
 program
@@ -21,7 +28,7 @@ program
   .description(
     "Ensemble AI coding — run N parallel agents on the same task, select the best result",
   )
-  .version("0.1.0");
+  .version(pkg.version);
 
 const cfg = loadConfig();
 
