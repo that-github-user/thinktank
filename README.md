@@ -14,13 +14,14 @@
 <p align="center">
   <a href="#quick-start">Quick Start</a> &middot;
   <a href="#how-it-works">How It Works</a> &middot;
+  <a href="#commands">Commands</a> &middot;
   <a href="CONTRIBUTING.md">Contributing</a> &middot;
   <a href="#references">References</a>
 </p>
 
 ---
 
-Run N parallel Claude Code agents on the same task, then select the best result via test execution and convergence analysis. Based on the principle that **the aggregate of independent attempts outperforms any single attempt** — proven in [ensemble ML](https://en.wikipedia.org/wiki/Ensemble_learning), [superforecasting](https://en.wikipedia.org/wiki/Superforecasting), and [LLM code generation research](#references).
+Run N parallel Claude Code agents on the same task, then select the best result via test execution and **Copeland pairwise scoring**. Based on the principle that **the aggregate of independent attempts outperforms any single attempt** — proven in [ensemble ML](https://en.wikipedia.org/wiki/Ensemble_learning), [superforecasting](https://en.wikipedia.org/wiki/Superforecasting), and [LLM code generation research](#references).
 
 ## Quick start
 
@@ -36,8 +37,18 @@ thinktank run "fix the authentication bypass"
 # Run 5 agents with test verification
 thinktank run "fix the race condition" -n 5 -t "npm test"
 
+# Read prompt from a file (avoids shell expansion issues)
+thinktank run -f task.md -n 5 -t "npm test"
+
+# Pipe prompt from stdin
+echo "refactor the parser" | thinktank run -n 3
+
 # Apply the best result
 thinktank apply
+
+# Set persistent defaults
+thinktank config set attempts 5
+thinktank config set model opus
 ```
 
 Requires [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated.
@@ -82,8 +93,16 @@ Use `--model` to select a Claude model: `sonnet` (default), `opus`, `haiku`, or 
 2. Each agent independently solves the task (no shared context = true independence)
 3. Runs your **test suite** on each result
 4. Analyzes **convergence** — did the agents agree on an approach?
-5. **Recommends** the best candidate (tests passing + consensus + smallest diff)
+5. **Recommends** the best candidate via Copeland pairwise scoring
 6. You review and `thinktank apply`
+
+## Scoring
+
+The default scoring method is **Copeland pairwise ranking**. Every agent is compared head-to-head against every other agent across four criteria: tests passed, convergence group size, minimal file scope, and test files contributed. The agent that wins the most pairwise matchups is recommended.
+
+An alternative `--scoring weighted` method is also available, which assigns point values to tests (100), convergence (50), and diff size (10). A third method, **Borda count** (rank aggregation), is available for comparison via `thinktank evaluate`.
+
+Use `thinktank evaluate` to compare how all three scoring methods rank your results. See [docs/scoring-evaluation.md](docs/scoring-evaluation.md) for the full analysis.
 
 ## Why this works
 
@@ -102,29 +121,91 @@ The key insight: **parallel attempts cost more tokens but not more time.** All a
 - **High-stakes changes** — auth, payments, security, data migrations
 - **Ambiguous tasks** — multiple valid approaches, need to see the spread
 - **Complex refactors** — many files, easy to miss something
-- **Unfamiliar codebases** — agents might go the wrong direction
+- **Unfamiliar codebases** — multiple attempts reduce the chance of going down the wrong path
 
-## Usage
+## Commands
+
+### `thinktank run [prompt]`
+
+Run N parallel agents on a task.
+
+| Flag | Description |
+|------|-------------|
+| `-n, --attempts <N>` | Number of parallel agents (default: 3, max: 20) |
+| `-f, --file <path>` | Read prompt from a file |
+| `-t, --test-cmd <cmd>` | Test command to verify results |
+| `--test-timeout <sec>` | Timeout for test command in seconds (default: 120, max: 600) |
+| `--timeout <sec>` | Timeout per agent in seconds (default: 600, max: 1800) |
+| `--model <model>` | Claude model: sonnet, opus, haiku, or full ID |
+| `-r, --runner <name>` | AI coding tool to use (default: claude-code) |
+| `--scoring <method>` | Scoring method: `copeland` (default) or `weighted` |
+| `--threshold <number>` | Convergence clustering similarity threshold, 0.0–1.0 (default: 0.3) |
+| `--whitespace-insensitive` | Ignore whitespace in convergence comparison |
+| `--retry` | Re-run only failed/timed-out agents from the last run |
+| `--output-format <fmt>` | Output format: `text` (default) or `json` |
+| `--no-color` | Disable colored output |
+| `--verbose` | Show detailed agent output |
+
+### `thinktank apply`
+
+Apply the recommended agent's changes to your working tree.
+
+| Flag | Description |
+|------|-------------|
+| `-a, --agent <N>` | Apply a specific agent's result instead of the recommended one |
+| `-p, --preview` | Show the diff without applying |
+| `-d, --dry-run` | Same as `--preview` (alias) |
+
+### `thinktank undo`
+
+Reverse the last applied diff.
+
+### `thinktank list [run-number]`
+
+List all past runs, or show details for a specific run.
+
+### `thinktank compare <agentA> <agentB>`
+
+Compare two agents' results side by side.
+
+### `thinktank stats`
+
+Show aggregate statistics across all runs.
+
+| Flag | Description |
+|------|-------------|
+| `--model <name>` | Filter to runs using a specific model |
+| `--since <date>` | Show runs from this date onward (ISO 8601) |
+| `--until <date>` | Show runs up to this date (ISO 8601) |
+| `--passed-only` | Only runs where at least one agent passed tests |
+
+### `thinktank evaluate`
+
+Compare scoring methods (weighted vs Copeland vs Borda) across all runs to see how they differ in recommendations.
+
+### `thinktank clean`
+
+Remove thinktank worktrees and branches. Add `--all` to also delete `.thinktank/` run history.
+
+### `thinktank config set|get|list`
+
+View and update persistent configuration (stored in `.thinktank/config.json`).
 
 ```bash
-# Run with defaults (3 agents, sonnet model)
-thinktank run "add rate limiting to the API"
-
-# Run 5 agents with test verification
-thinktank run "fix the race condition in the cache layer" -n 5 -t "npm test"
-
-# Use a specific model
-thinktank run "migrate callbacks to async/await" --model opus -n 3
-
-# Apply the recommended result
-thinktank apply
-
-# Apply a specific agent's result
-thinktank apply --agent 2
-
-# View the last run's results
-thinktank list
+thinktank config set attempts 5    # persistent default
+thinktank config set model opus
+thinktank config get attempts
+thinktank config list              # show all values
 ```
+
+Available keys: `attempts`, `model`, `timeout`, `runner`, `threshold`, `testTimeout`.
+
+## Pre-flight checks
+
+Before spawning agents, thinktank validates the environment:
+
+1. **Disk space** — warns if there isn't enough room for N worktrees
+2. **Test suite** — if `--test-cmd` is set, runs the tests once on the main branch to verify the suite passes before spending tokens on parallel agents
 
 ## Example output
 
@@ -152,21 +233,27 @@ Convergence
   Strong consensus — 3/5 agents changed the same files
   Files: src/middleware/auth.ts, tests/auth.test.ts
 
-  Agents [3]:       ████░░░░░░░░░░░░░░░░ 20%
-  Divergent approach — 1/5 agents went a different direction
-  Files: src/middleware/auth.ts, src/utils/jwt.ts, tests/auth.test.ts
+Copeland Pairwise Scoring
+────────────────────────────────────────────────────────────
+  Agent   Tests     Converge  Scope     TestCov   Copeland
+  ──────────────────────────────────────────────────────────
+>> #1     +1        +2        0         +1        +4
+  #2      +1        +2        0         0         +3
+  #3      +1        -3        -4        0         -6
+  #4      -4        -3        +4        -1        -4
+  #5      +1        +2        0         0         +3
 
-  Recommended: Agent #1 (highest score based on tests + convergence + diff size)
+  Recommended: Agent #1 (Copeland winner)
 ```
 
 ## How it compares
 
-| Approach | Reliability | Cost | Speed |
-|----------|-------------|------|-------|
-| Single Claude Code run | pass@1 | 1x | Fastest |
-| **thinktank (N=3)** | **~pass@3** | **3x** | **Same wall time** |
-| **thinktank (N=5)** | **~pass@5** | **5x** | **Same wall time** |
-| Manual retry loop | pass@k (sequential) | kx | k × slower |
+| Approach | Reliability | Cost | Speed | Selection |
+|----------|-------------|------|-------|-----------|
+| Single Claude Code run | pass@1 | 1x | Fastest | N/A |
+| **thinktank (N=3)** | **~pass@3** | **3x** | **Same wall time** | **Copeland pairwise** |
+| **thinktank (N=5)** | **~pass@5** | **5x** | **Same wall time** | **Copeland pairwise** |
+| Manual retry loop | pass@k (sequential) | kx | k × slower | Manual |
 
 ## References
 
@@ -183,3 +270,6 @@ Convergence
 ### Ensemble theory
 - *Superforecasting* — Tetlock & Gardner. The aggregate of independent forecasters consistently beats individuals.
 - *The Wisdom of Crowds* — Surowiecki. Independent estimates, when aggregated, converge on truth.
+
+### Technical reports
+- [Scoring Method Evaluation](docs/scoring-evaluation.md) — Copeland vs Weighted vs Borda across 21 runs. Key finding: Copeland and Borda agree 86%, weighted disagrees ~40%.
