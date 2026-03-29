@@ -9,7 +9,7 @@ export interface RunOptions {
   verbose: boolean;
   runner?: string;
   scoring: "weighted" | "copeland";
-  outputFormat: "text" | "json";
+  outputFormat: "text" | "json" | "diff";
   retry?: boolean;
   whitespaceInsensitive?: boolean;
 }

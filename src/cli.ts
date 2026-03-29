@@ -37,6 +37,7 @@ program
     String(cfg.testTimeout),
   )
   .option("--timeout <seconds>", "Timeout per agent in seconds", String(cfg.timeout))
+  .option("--no-timeout", "Disable agent timeout entirely")
   .option("--model <model>", "Claude model to use", cfg.model)
   .option("-r, --runner <name>", "AI coding tool to use", cfg.runner)
   .option(
@@ -46,7 +47,7 @@ program
   )
   .option("--scoring <method>", "Scoring method: copeland (default) or weighted", "copeland")
   .option("--no-color", "Disable colored output")
-  .option("--output-format <format>", "Output format: text (default) or json", "text")
+  .option("--output-format <format>", "Output format: text (default), json, or diff", "text")
   .option("--verbose", "Show detailed output from each agent")
   .option("--whitespace-insensitive", "Ignore whitespace differences in convergence comparison")
   .option("--retry", "Re-run only failed/timed-out agents from the last run")
@@ -57,8 +58,9 @@ program
       process.exit(1);
     }
 
-    const timeout = parseInt(opts.timeout, 10);
-    if (Number.isNaN(timeout) || timeout < 10 || timeout > 1800) {
+    // --no-timeout: commander sets opts.timeout to false
+    const timeout = opts.timeout === false ? 0 : parseInt(opts.timeout, 10);
+    if (opts.timeout !== false && (Number.isNaN(timeout) || timeout < 10 || timeout > 1800)) {
       console.error("Error: --timeout must be a number between 10 and 1800 seconds");
       process.exit(1);
     }
@@ -80,7 +82,7 @@ program
       process.env.NO_COLOR = "1";
     }
 
-    const validFormats = ["text", "json"];
+    const validFormats = ["text", "json", "diff"];
     if (!validFormats.includes(opts.outputFormat)) {
       console.error(`Error: --output-format must be one of: ${validFormats.join(", ")}`);
       process.exit(1);

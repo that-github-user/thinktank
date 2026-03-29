@@ -42,3 +42,37 @@ describe("CLI model validation", () => {
     assert.equal(isKnownModel("unknown"), false);
   });
 });
+
+describe("CLI --no-timeout flag", () => {
+  function parseTimeout(optsTimeout: string | false): number {
+    // Mirrors cli.ts logic: --no-timeout sets opts.timeout to false
+    return optsTimeout === false ? 0 : parseInt(optsTimeout as string, 10);
+  }
+
+  function validateTimeout(optsTimeout: string | false): string | null {
+    const timeout = parseTimeout(optsTimeout);
+    if (optsTimeout !== false && (Number.isNaN(timeout) || timeout < 10 || timeout > 1800)) {
+      return "Error: --timeout must be a number between 10 and 1800 seconds";
+    }
+    return null;
+  }
+
+  it("--no-timeout sets timeout to 0", () => {
+    assert.equal(parseTimeout(false), 0);
+  });
+
+  it("--no-timeout passes validation", () => {
+    assert.equal(validateTimeout(false), null);
+  });
+
+  it("normal timeout values still validate", () => {
+    assert.equal(validateTimeout("300"), null);
+    assert.equal(parseTimeout("300"), 300);
+  });
+
+  it("invalid timeout values are rejected", () => {
+    assert.notEqual(validateTimeout("5"), null);
+    assert.notEqual(validateTimeout("abc"), null);
+    assert.notEqual(validateTimeout("9999"), null);
+  });
+});

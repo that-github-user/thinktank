@@ -82,28 +82,31 @@ export const claudeCodeRunner: Runner = {
         error += data.toString();
       });
 
-      const timer = setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          child.kill("SIGTERM");
-          resolve({
-            id,
-            worktree: opts.worktreePath,
-            status: "timeout",
-            exitCode: -1,
-            duration: Date.now() - start,
-            output,
-            error: `Timed out after ${opts.timeout}s`,
-            diff: "",
-            filesChanged: [],
-            linesAdded: 0,
-            linesRemoved: 0,
-          });
-        }
-      }, opts.timeout * 1000);
+      const timer =
+        opts.timeout > 0
+          ? setTimeout(() => {
+              if (!settled) {
+                settled = true;
+                child.kill("SIGTERM");
+                resolve({
+                  id,
+                  worktree: opts.worktreePath,
+                  status: "timeout",
+                  exitCode: -1,
+                  duration: Date.now() - start,
+                  output,
+                  error: `Timed out after ${opts.timeout}s`,
+                  diff: "",
+                  filesChanged: [],
+                  linesAdded: 0,
+                  linesRemoved: 0,
+                });
+              }
+            }, opts.timeout * 1000)
+          : null;
 
       child.on("close", async (code) => {
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         if (settled) return;
         settled = true;
 
@@ -136,7 +139,7 @@ export const claudeCodeRunner: Runner = {
       });
 
       child.on("error", (err) => {
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         if (settled) return;
         settled = true;
 
