@@ -15,6 +15,7 @@ import {
   getRepoRoot,
   removeWorktree,
 } from "../utils/git.js";
+import { createProgressTracker } from "../utils/progress.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -213,24 +214,43 @@ export async function retry(opts: RunOptions): Promise<void> {
   console.log(`  Re-running ${failed.length} agent(s) in parallel (${runner.name})...`);
   console.log();
 
+  const showProgress = opts.outputFormat === "text";
+  const tracker = showProgress
+    ? createProgressTracker(
+        worktrees.map((w) => w.id),
+        Boolean(process.stdout.isTTY),
+      )
+    : null;
+
+  tracker?.start();
+
   const agentPromises = worktrees.map(({ id, path }) =>
-    runner.run(id, {
-      prompt: previous.prompt,
-      worktreePath: path,
-      model: previous.model,
-      timeout: opts.timeout,
-      verbose: opts.verbose,
-    }),
+    runner
+      .run(id, {
+        prompt: previous.prompt,
+        worktreePath: path,
+        model: previous.model,
+        timeout: opts.timeout,
+        verbose: opts.verbose,
+      })
+      .then((result) => {
+        tracker?.onAgentComplete(result);
+        return result;
+      }),
   );
 
   const retriedAgents: AgentResult[] = await Promise.all(agentPromises);
 
-  for (const agent of retriedAgents) {
-    const icon = agent.status === "success" ? "✓" : agent.status === "timeout" ? "⏱" : "✗";
-    const files = agent.filesChanged.length;
-    console.log(
-      `    Agent #${agent.id}: ${icon} ${agent.status} — ${files} files changed in ${Math.round(agent.duration / 1000)}s`,
-    );
+  tracker?.finish();
+
+  if (!showProgress || !process.stdout.isTTY) {
+    for (const agent of retriedAgents) {
+      const icon = agent.status === "success" ? "✓" : agent.status === "timeout" ? "⏱" : "✗";
+      const files = agent.filesChanged.length;
+      console.log(
+        `    Agent #${agent.id}: ${icon} ${agent.status} — ${files} files changed in ${Math.round(agent.duration / 1000)}s`,
+      );
+    }
   }
   console.log();
 
@@ -400,25 +420,44 @@ export async function run(opts: RunOptions): Promise<void> {
   console.log(`  Running ${opts.attempts} agents in parallel (${runner.name})...`);
   console.log();
 
+  const showProgress = opts.outputFormat === "text";
+  const tracker = showProgress
+    ? createProgressTracker(
+        worktrees.map((w) => w.id),
+        Boolean(process.stdout.isTTY),
+      )
+    : null;
+
+  tracker?.start();
+
   const agentPromises = worktrees.map(({ id, path }) =>
-    runner.run(id, {
-      prompt: opts.prompt,
-      worktreePath: path,
-      model: opts.model,
-      timeout: opts.timeout,
-      verbose: opts.verbose,
-    }),
+    runner
+      .run(id, {
+        prompt: opts.prompt,
+        worktreePath: path,
+        model: opts.model,
+        timeout: opts.timeout,
+        verbose: opts.verbose,
+      })
+      .then((result) => {
+        tracker?.onAgentComplete(result);
+        return result;
+      }),
   );
 
   const agents: AgentResult[] = await Promise.all(agentPromises);
 
-  // Report completion
-  for (const agent of agents) {
-    const icon = agent.status === "success" ? "✓" : agent.status === "timeout" ? "⏱" : "✗";
-    const files = agent.filesChanged.length;
-    console.log(
-      `    Agent #${agent.id}: ${icon} ${agent.status} — ${files} files changed in ${Math.round(agent.duration / 1000)}s`,
-    );
+  tracker?.finish();
+
+  // Report completion (skip in TTY mode — progress tracker already showed status)
+  if (!showProgress || !process.stdout.isTTY) {
+    for (const agent of agents) {
+      const icon = agent.status === "success" ? "✓" : agent.status === "timeout" ? "⏱" : "✗";
+      const files = agent.filesChanged.length;
+      console.log(
+        `    Agent #${agent.id}: ${icon} ${agent.status} — ${files} files changed in ${Math.round(agent.duration / 1000)}s`,
+      );
+    }
   }
   console.log();
 
