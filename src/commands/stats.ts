@@ -4,7 +4,7 @@ import pc from "picocolors";
 import type { EnsembleResult } from "../types.js";
 import { parseAndValidateResult } from "../utils/schema.js";
 
-export interface StatsOptions {
+interface StatsOptions {
   model?: string;
   since?: string;
   until?: string;

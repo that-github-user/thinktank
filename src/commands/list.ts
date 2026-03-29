@@ -14,11 +14,6 @@ export interface RunSummary {
   avgConvergence: number | null;
 }
 
-/** Run numbers are assigned by sort order (chronological), not embedded in filename */
-export function extractRunNumber(_filename: string): number {
-  return -1; // Assigned by loadAllRuns based on sort position
-}
-
 export function buildRunSummary(runNumber: number, result: EnsembleResult): RunSummary {
   const testPassRate =
     result.tests.length > 0
