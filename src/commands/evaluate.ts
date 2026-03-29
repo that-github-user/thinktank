@@ -3,6 +3,7 @@ import { join } from "node:path";
 import pc from "picocolors";
 import { analyzeConvergence, copelandRecommend, recommend } from "../scoring/convergence.js";
 import type { EnsembleResult } from "../types.js";
+import { padRight } from "../utils/display.js";
 import { parseAndValidateResult } from "../utils/schema.js";
 
 interface RunEvaluation {
@@ -205,13 +206,6 @@ export async function evaluate(): Promise<void> {
   }
 
   console.log();
-}
-
-function padRight(str: string, len: number): string {
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional ANSI escape sequence matching
-  const stripped = str.replace(/\x1b\[[0-9;]*m/g, "");
-  const padding = Math.max(0, len - stripped.length);
-  return str + " ".repeat(padding);
 }
 
 function pct(n: number, total: number): string {

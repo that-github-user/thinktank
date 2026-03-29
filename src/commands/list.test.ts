@@ -1,14 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { EnsembleResult } from "../types.js";
-import { buildRunSummary, extractRunNumber } from "./list.js";
-
-describe("extractRunNumber", () => {
-  it("returns -1 (run numbers assigned by load order, not filename)", () => {
-    assert.equal(extractRunNumber("run-2026-03-28T05-58-48-564Z.json"), -1);
-    assert.equal(extractRunNumber("latest.json"), -1);
-  });
-});
+import { buildRunSummary } from "./list.js";
 
 function makeResult(overrides: Partial<EnsembleResult> = {}): EnsembleResult {
   return {

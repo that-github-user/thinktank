@@ -4,7 +4,7 @@ import pc from "picocolors";
 import { diffSimilarity, parseDiff } from "../scoring/diff-parser.js";
 import type { AgentResult, EnsembleResult } from "../types.js";
 
-export interface CompareOptions {
+interface CompareOptions {
   agentA: number;
   agentB: number;
 }

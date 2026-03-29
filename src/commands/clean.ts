@@ -6,7 +6,7 @@ import { cleanupBranches, getRepoRoot, removeWorktree } from "../utils/git.js";
 
 const exec = promisify(execFile);
 
-export interface CleanOptions {
+interface CleanOptions {
   all?: boolean;
 }
 
