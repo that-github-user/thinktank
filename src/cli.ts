@@ -115,7 +115,11 @@ program
     }
 
     const knownModels = ["sonnet", "opus", "haiku"];
-    if (!knownModels.includes(opts.model) && !opts.model.startsWith("claude-")) {
+    if (
+      !knownModels.includes(opts.model) &&
+      !opts.model.startsWith("claude-") &&
+      !opts.model.startsWith("anthropic.")
+    ) {
       console.warn(
         `Warning: unknown model "${opts.model}" — known models: ${knownModels.join(", ")}`,
       );

@@ -46,6 +46,8 @@ Requires [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) insta
 
 Use `--model` to select a Claude model: `sonnet` (default), `opus`, `haiku`, or a full model ID like `claude-opus-4-6`.
 
+**Amazon Bedrock**: Pass a Bedrock model ID such as `anthropic.claude-opus-4-6-v1` and set the standard AWS environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, etc.). See `.env.example` for details.
+
 ## How it works
 
 ```
