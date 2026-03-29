@@ -121,6 +121,65 @@ describe("diffSimilarity", () => {
   it("returns 1 for two empty diffs", () => {
     assert.equal(diffSimilarity("", ""), 1);
   });
+
+  it("treats reformatted code as different by default", () => {
+    const diffA = `diff --git a/a.ts b/a.ts
+--- a/a.ts
++++ b/a.ts
+@@ -1 +1 @@
++if (x) {  return  true; }`;
+    const diffB = `diff --git a/a.ts b/a.ts
+--- a/a.ts
++++ b/a.ts
+@@ -1 +1 @@
++if (x) { return true; }`;
+    const sim = diffSimilarity(diffA, diffB);
+    assert.ok(sim < 1, "default mode should see whitespace differences");
+  });
+
+  it("whitespace-insensitive mode treats reformatted code as identical", () => {
+    const diffA = `diff --git a/a.ts b/a.ts
+--- a/a.ts
++++ b/a.ts
+@@ -1 +1 @@
++if (x) {  return  true; }`;
+    const diffB = `diff --git a/a.ts b/a.ts
+--- a/a.ts
++++ b/a.ts
+@@ -1 +1 @@
++if (x) { return true; }`;
+    assert.equal(diffSimilarity(diffA, diffB, true), 1);
+  });
+
+  it("whitespace-insensitive mode normalizes indentation differences", () => {
+    const diffA = `diff --git a/a.ts b/a.ts
+--- a/a.ts
++++ b/a.ts
+@@ -1 +1 @@
++    const x = 1;
++        const y = 2;`;
+    const diffB = `diff --git a/a.ts b/a.ts
+--- a/a.ts
++++ b/a.ts
+@@ -1 +1 @@
++  const x = 1;
++  const y = 2;`;
+    assert.equal(diffSimilarity(diffA, diffB, true), 1);
+  });
+
+  it("whitespace-insensitive mode still detects real code differences", () => {
+    const diffA = `diff --git a/a.ts b/a.ts
+--- a/a.ts
++++ b/a.ts
+@@ -1 +1 @@
++const x = 1;`;
+    const diffB = `diff --git a/a.ts b/a.ts
+--- a/a.ts
++++ b/a.ts
+@@ -1 +1 @@
++const y = 2;`;
+    assert.equal(diffSimilarity(diffA, diffB, true), 0);
+  });
 });
 
 describe("pairwiseSimilarity", () => {

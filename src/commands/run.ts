@@ -202,7 +202,7 @@ export async function retry(opts: RunOptions): Promise<void> {
   }
 
   // Phase 5: Convergence analysis on full merged set
-  const convergence = analyzeConvergence(mergedAgents, opts.threshold);
+  const convergence = analyzeConvergence(mergedAgents, opts.threshold, opts.whitespaceInsensitive);
 
   // Phase 6: Recommendation
   const { recommended: weightedRec, scores } = recommend(mergedAgents, testResults, convergence);
@@ -346,7 +346,7 @@ export async function run(opts: RunOptions): Promise<void> {
   }
 
   // Phase 4: Convergence analysis
-  const convergence = analyzeConvergence(agents, opts.threshold);
+  const convergence = analyzeConvergence(agents, opts.threshold, opts.whitespaceInsensitive);
 
   // Phase 5: Recommendation
   const { recommended: weightedRec, scores } = recommend(agents, testResults, convergence);

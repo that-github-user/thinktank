@@ -11,6 +11,7 @@ export interface RunOptions {
   scoring: "weighted" | "copeland";
   outputFormat: "text" | "json";
   retry?: boolean;
+  whitespaceInsensitive?: boolean;
 }
 
 export interface AgentResult {
