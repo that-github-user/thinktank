@@ -10,6 +10,7 @@ import {
   loadLatestResult,
   makeResultFilename,
   mergeRetryResults,
+  preflightTestRun,
   preflightValidation,
 } from "./run.js";
 
@@ -434,5 +435,36 @@ describe("checkDiskSpace", () => {
     if (result !== null) {
       assert.ok(result.includes("1000000 worktrees"));
     }
+  });
+});
+
+describe("preflightTestRun", () => {
+  it("returns null when test command succeeds", async () => {
+    const result = await preflightTestRun("node --version", process.cwd());
+    assert.equal(result, null);
+  });
+
+  it("returns warning when test command fails", async () => {
+    const result = await preflightTestRun("node --require ./nonexistent-module.js", process.cwd());
+    assert.ok(result);
+    assert.ok(result.includes("failed on the current branch"));
+    assert.ok(result.includes("test environment may already be broken"));
+  });
+
+  it("returns warning with output snippet when test produces output", async () => {
+    const result = await preflightTestRun("node --require ./nonexistent-module.js", process.cwd());
+    assert.ok(result);
+    assert.ok(result.includes("failed on the current branch"));
+  });
+
+  it("returns null for a passing test with output", async () => {
+    const result = await preflightTestRun("node --version", process.cwd());
+    assert.equal(result, null);
+  });
+
+  it("returns warning when command is not found", async () => {
+    const result = await preflightTestRun("nonexistent-command-xyz", process.cwd());
+    assert.ok(result);
+    assert.ok(result.includes("failed on the current branch"));
   });
 });
