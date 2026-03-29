@@ -181,7 +181,7 @@ export async function retry(opts: RunOptions): Promise<void> {
   await cleanupBranches().catch(() => {});
 
   // Phase 1: Create worktrees only for failed agents
-  console.log("  Creating worktrees for failed agents...");
+  console.log("  Setting up agent environments for failed agents...");
   const worktrees: Array<{ id: number; path: string }> = [];
 
   const handleSigint = () => {
@@ -387,7 +387,7 @@ export async function run(opts: RunOptions): Promise<void> {
   await cleanupBranches().catch(() => {});
 
   // Phase 1: Create worktrees
-  console.log("  Creating worktrees...");
+  console.log("  Setting up agent environments...");
   const worktrees: Array<{ id: number; path: string }> = [];
 
   // Graceful Ctrl+C: clean up all worktrees created so far, then exit.
