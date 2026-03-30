@@ -124,6 +124,28 @@ The key insight: **parallel attempts cost more tokens but not more time.** All a
 - **Complex refactors** — many files, easy to miss something
 - **Unfamiliar codebases** — multiple attempts reduce the chance of going down the wrong path
 
+## Recommended workflows
+
+### Two-phase: generate tests, then implement
+
+A single agent can write a wrong test that becomes a false oracle. Use the ensemble to validate your test suite before using it to judge implementations.
+
+**Phase 1 — generate tests:**
+```bash
+thinktank run "write unit tests for grid.py pathfinding" -n 5 -t "bash run-collect-tests.sh"
+thinktank compare 1 2  # compare assertions across agents
+```
+
+If all agents assert the same expected values, the tests are likely correct. If they disagree on a specific assertion (e.g., 3 agents say path length 9, 1 says 13), investigate before proceeding.
+
+**Phase 2 — implement:**
+```bash
+thinktank apply           # apply the converged test suite
+thinktank run "implement A* pathfinding in grid.py" -n 5 -t "python -m pytest"
+```
+
+**Why this matters:** During development, a single agent wrote a test asserting a shortest path of 13 steps when the correct answer was 9. This wrong test caused 13+ ensemble runs to show 0% pass rate — every agent was right, but the oracle was wrong. Using ensemble test generation would have caught the bad assertion via convergence analysis before it became the ground truth.
+
 ## Commands
 
 ### `thinktank run [prompt]`
