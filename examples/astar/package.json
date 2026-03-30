@@ -1,0 +1,15 @@
+{
+  "name": "astar-showcase",
+  "version": "1.0.0",
+  "description": "A* pathfinding showcase for thinktank ensemble testing",
+  "type": "module",
+  "scripts": {
+    "test": "npx tsx --test tests/*.test.ts",
+    "build": "npx tsc"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}
