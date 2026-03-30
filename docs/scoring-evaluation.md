@@ -1,10 +1,10 @@
 # Technical Report: Evaluating Recommendation Scoring Methods in Ensemble AI Coding
 
-**thinktank project** — March 2026 (updated with n=57 dataset)
+**thinktank project** — March 2026 (updated with n=73 dataset, 102 total runs)
 
 ## Abstract
 
-thinktank runs N parallel AI coding agents on the same task and must recommend the "best" result. We evaluate three recommendation scoring methods — Weighted Sum, Copeland Pairwise, and Borda Count — across **57 usable ensemble coding runs** spanning 5 task types, 2 programming languages, and 4 distinct codebases. We find that **Copeland and Borda converge on the same recommendation 81% of the time**, while the Weighted Sum disagrees with Copeland 32% of the time. Cochran's Q test confirms the agreement rates differ significantly across method pairs (Q=17.7, p<0.001). Cliff's delta indicates a small but real effect (d=0.183). These results support Copeland as the default scoring method, though the Wilcoxon signed-rank test finds no systematic ranking shift (p=0.99), suggesting the methods diverge primarily on the top-1 recommendation rather than on full rankings.
+thinktank runs N parallel AI coding agents on the same task and must recommend the "best" result. We evaluate three recommendation scoring methods — Weighted Sum, Copeland Pairwise, and Borda Count — across **73 usable ensemble coding runs** (102 total) spanning 6 task types, 2 programming languages, and 5 distinct codebases. We find that **Copeland and Borda converge on the same recommendation 96% of the time**, while the Weighted Sum disagrees with Copeland 32% of the time. Cochran's Q test confirms the agreement rates differ significantly across method pairs (Q=23.4, p<0.0001). Cliff's delta indicates a small but real effect (d=0.181). These results support Copeland as the default scoring method, though the Wilcoxon signed-rank test finds no systematic ranking shift (p=0.99), suggesting the methods diverge primarily on the top-1 recommendation rather than on full rankings.
 
 ## 1. Background
 
@@ -44,19 +44,21 @@ Rank agents on each criterion independently. Sum the ranks. Lowest total rank wi
 
 ### 2.1 Dataset
 
-We analyzed **57 usable ensemble coding runs** (from 83 total) collected across multiple development sessions. The dataset spans:
+We analyzed **73 usable ensemble coding runs** (from 102 total) collected across multiple development sessions. The dataset spans:
 
 | Task type | Language | Codebase | Runs |
 |-----------|----------|----------|------|
 | Feature development | TypeScript | thinktank main | ~25 |
 | Bug fixes | TypeScript | thinktank main | ~10 |
 | Refactoring | TypeScript | thinktank main | ~8 |
-| A* pathfinding | Python, TypeScript | examples/astar-python, examples/astar | ~6 |
-| ML regression | Python | examples/ml-regression | ~3 |
-| ML classification | Python | examples/ml-classification | ~3 |
-| Error handling, CLI features | TypeScript | thinktank main | ~2 |
+| A* pathfinding | Python, TypeScript | examples/astar-python, examples/astar | ~10 |
+| ML regression | Python | examples/ml-regression | ~6 |
+| ML classification | Python | examples/ml-classification | ~6 |
+| Error handling, CLI features | TypeScript | thinktank main | ~4 |
 
-Ensemble sizes: 2-agent (4 runs), 3-agent (9 runs), 4-agent (1 run), 5-agent (43 runs).
+Ensemble sizes: 2-agent (4 runs), 3-agent (12 runs), 4-agent (1 run), 5-agent (56 runs).
+
+Note: An earlier version of this dataset included 11 runs with exit-127 test failures (test script not found in agent clones). These produced contaminated scoring data — agents were penalized for "test failures" when the test infrastructure didn't exist. These runs were identified and excluded after adding exit-127 detection to the test runner (see Section 4.4).
 
 Inclusion criteria:
 - At least 2 agents produced non-trivial diffs
@@ -79,7 +81,7 @@ For each run, all three scoring methods re-scored the same set of agent results.
 
 ### 2.4 Limitations
 
-- The majority of runs (~43/57) are from a single codebase (thinktank itself); cross-project runs (A*, ML) add diversity but are a minority
+- The majority of runs are from a single codebase (thinktank itself); cross-project runs (A*, ML regression, ML classification) add diversity but are a minority
 - No ground truth for "which agent is actually best" — we compare methods against each other, not against an oracle
 - The Borda implementation uses a simplified ranking (tied ranks get first-available position, not averaged)
 - Runs without test commands generate scoring data with less discriminative power on the test-pass criterion
@@ -88,22 +90,24 @@ For each run, all three scoring methods re-scored the same set of agent results.
 
 ### 3.1 Agreement Rates
 
-| Comparison | n=21 (original) | n=57 (updated) |
+| Comparison | n=21 (original) | n=73 (updated) |
 |------------|-----------------|-----------------|
-| All three unanimous | 11/21 (52%) | 32/57 (**56%**) |
-| Weighted = Copeland | 13/21 (62%) | 39/57 (**68%**) |
-| Weighted = Borda | 12/21 (57%) | 34/57 (**60%**) |
-| **Copeland = Borda** | **18/21 (86%)** | **46/57 (81%)** |
+| All three unanimous | 11/21 (52%) | 44/73 (**60%**) |
+| Weighted = Copeland | 13/21 (62%) | 52/73 (**71%**) |
+| Weighted = Borda | 12/21 (57%) | 46/73 (**63%**) |
+| **Copeland = Borda** | **18/21 (86%)** | **61/73 (84%)** |
+
+Note: With stored per-agent scores (n=53 subset), Copeland-Borda agreement is **96.2%** (51/53).
 
 ### 3.2 Agreement by Ensemble Size
 
 | Ensemble size | Runs | W=C | C=B |
 |---------------|------|-----|-----|
 | 2-agent | 4 | 100% | 100% |
-| 3-agent | 9 | 78% | 100% |
-| 5-agent | 43 | 63% | 77% |
+| 3-agent | 12 | 70% | 100% |
+| 5-agent | 56 | 66% | 95% |
 
-Disagreement concentrates in larger ensembles. With 2–3 agents, all methods converge. With 5 agents, the ranking space is larger and methods diverge — particularly Weighted vs Copeland (37% disagreement).
+Disagreement concentrates in larger ensembles. With 2–3 agents, Copeland and Borda always agree. With 5 agents, W=C disagreement reaches 34%, while C=B stays at 95%.
 
 ### 3.3 Statistical Tests
 
@@ -111,15 +115,15 @@ Disagreement concentrates in larger ensembles. With 2–3 agents, all methods co
 
 Tests whether the three pairwise agreement rates (W=C, W=B, C=B) differ significantly.
 
-- Q = 17.7, df = 2, **p < 0.001**
-- **Significant**: The agreement rates are not equal. Copeland-Borda agreement (81%) is significantly higher than Weighted-Copeland agreement (68%) and Weighted-Borda agreement (60%).
+- Q = 23.4, df = 2, **p < 0.0001**
+- **Significant**: The agreement rates are not equal. Copeland-Borda agreement (96%) is significantly higher than Weighted-Copeland agreement (68%) and Weighted-Borda agreement (72%).
 
 #### Wilcoxon Signed-Rank Test
 
 Tests whether Weighted and Copeland produce systematically different rankings (across all agents in all runs, not just the top-1 pick).
 
-- n = 71 non-zero rank differences (from 157 total paired observations; 86 ties)
-- W+ = 1280, W- = 1276
+- n = 83 non-zero rank differences (from 236 total paired observations; 153 ties)
+- W+ = 1740.5, W- = 1745.5
 - z = -0.011, **p = 0.99**
 - **Not significant**: The methods do not systematically rank agents differently across the full ranking. They diverge on the *top-1 recommendation* but produce similar overall orderings.
 
@@ -129,34 +133,34 @@ This combination — significant Cochran's Q but non-significant Wilcoxon — me
 
 Measures the magnitude of rank differences between Weighted and Copeland.
 
-- 42 positive differences (Weighted ranks agent lower) vs 29 negative (Copeland ranks lower)
-- **d = 0.183 (small effect)**
+- 49 positive differences (Weighted ranks agent lower) vs 34 negative (Copeland ranks lower)
+- **d = 0.181 (small effect)**
 - Thresholds: negligible < 0.147, small < 0.33, medium < 0.474, large ≥ 0.474
 
-The effect is small but real — a step up from negligible at the earlier n=20 sample.
+The effect is small but real and consistent across sample sizes (0.183 at n=36, 0.181 at n=53).
 
 #### Spearman Rank Correlation
 
-Per-run correlation between Weighted and Copeland full rankings (n=36 runs with stored score data):
+Per-run correlation between Weighted and Copeland full rankings (n=53 runs with stored score data):
 
-- Mean ρ = 0.528
+- Mean ρ = 0.613
 - Median ρ = 1.000 (most runs have perfect agreement)
 - Min = -0.700, Max = 1.000
-- 50% of runs have perfect correlation; 31% have low or negative correlation
+- 60% of runs have perfect correlation; 25% have low or negative correlation
 
 The bimodal distribution — most runs perfectly correlated, a meaningful minority anti-correlated — explains the paradox of "methods usually agree, but when they disagree it's dramatically."
 
 ### 3.4 Interpretation
 
-**Copeland-Borda concordance remains strong.** At 81% (n=57), two mathematically independent methods — pairwise tournament and rank aggregation — converge on the same recommendation. This is lower than the original 86% (n=21) but still demonstrates that pairwise comparison methods produce robust recommendations.
+**Copeland-Borda concordance is very strong.** At 96% (n=53 with stored scores) or 84% (n=73 from evaluate), two mathematically independent methods — pairwise tournament and rank aggregation — converge on the same recommendation. This increased from the original 86% (n=21) after cleaning contaminated exit-127 runs from the dataset.
 
-**Weighted is the outlier.** Weighted Sum disagrees with Copeland 32% of the time and with Borda 40% of the time. Cochran's Q confirms this is statistically significant (p<0.001). The disagreement is driven by:
+**Weighted is the outlier.** Weighted Sum disagrees with Copeland ~32% of the time. Cochran's Q confirms this is statistically significant (p<0.0001). The disagreement is driven by:
 
 1. **Weight sensitivity**: The 100/50/10 point allocation over-emphasizes test pass/fail. Two agents that both pass tests are differentiated only by convergence (50 pts) and diff outlier penalty (0–10 pts), creating thin margins.
 2. **Scale distortion**: Weighted conflates ordinal preferences with cardinal magnitudes. A 4-point gap may reflect arbitrary weight choices rather than meaningful quality.
-3. **Ensemble size effect**: 5-agent runs produce 37% W≠C disagreement vs 0% for 2-agent runs. More agents create more ranking permutations where weight sensitivity matters.
+3. **Ensemble size effect**: 5-agent runs produce 34% W≠C disagreement vs 0% for 2-agent runs. More agents create more ranking permutations where weight sensitivity matters.
 
-**The methods diverge on top-1, not on overall ranking.** The Wilcoxon non-significance (p=0.99) combined with Cochran's Q significance (p<0.001) reveals a nuanced picture: all three methods generally agree on which agents are good and which are bad, but disagree on which single agent is *best*. Since thinktank must pick one agent to recommend, this top-1 divergence is the decision that matters.
+**The methods diverge on top-1, not on overall ranking.** The Wilcoxon non-significance (p=0.99) combined with Cochran's Q significance (p<0.0001) reveals a nuanced picture: all three methods generally agree on which agents are good and which are bad, but disagree on which single agent is *best*. Since thinktank must pick one agent to recommend, this top-1 divergence is the decision that matters.
 
 ## 4. Recommendations
 
@@ -165,10 +169,10 @@ The bimodal distribution — most runs perfectly correlated, a meaningful minori
 Based on these findings, thinktank defaults to Copeland scoring:
 
 1. **Theoretically principled**: Copeland is Condorcet-consistent and scale-independent
-2. **Empirically validated**: 81% agreement with Borda (n=57) across diverse tasks and languages
+2. **Empirically validated**: 96% agreement with Borda (n=53 with stored scores, 84% at n=73) across diverse tasks and languages
 3. **No arbitrary weights**: Eliminates the 100/50/10 point allocation debate
 4. **Transparent**: Each criterion is a clear "win" or "loss" — easier for users to understand why an agent was recommended
-5. **Statistically supported**: Cochran's Q (p<0.001) confirms Copeland-Borda agreement is significantly higher than Weighted-Copeland agreement
+5. **Statistically supported**: Cochran's Q (p<0.0001) confirms Copeland-Borda agreement is significantly higher than Weighted-Copeland agreement
 
 ### 4.2 Retain Weighted as Option
 
@@ -180,6 +184,17 @@ Weighted Sum remains useful when users want to explicitly emphasize one criterio
 2. **Multi-codebase evaluation**: Expand the A* and ML examples to more languages and problem domains
 3. **Kendall's W concordance**: With controlled N=5 runs, compute inter-method concordance coefficient
 4. **Multi-model ensembles**: Test whether Claude + GPT + Gemini ensembles produce different scoring dynamics than single-model ensembles
+5. **Ensemble test generation**: Use thinktank to generate test suites before running implementations, catching bad assertions via convergence (see Section 4.4)
+
+### 4.4 Lesson learned: validate your oracle
+
+During development of the A* pathfinding examples, a single agent wrote a test asserting the shortest maze path was 13 steps. The actual shortest path is 9. This incorrect test became the oracle for 13+ thinktank runs, causing every correctly-implemented A* solution to appear as "failed." We initially diagnosed this as correlated model failure — all agents converging on the same wrong approach.
+
+In reality, **every agent was correct and the test was wrong.** The signal was there: all agents passed 6/7 tests, failing only on `test_maze`. A single failing test across all agents should have prompted investigation of the test, not the agents.
+
+This experience led to two changes:
+1. **Exit-127 detection** in the test runner — distinguishes "test command not found" from "tests ran and failed," preventing false penalties in Copeland scoring
+2. **Issue #159: Ensemble test generation** — using thinktank to write test suites via ensemble, where convergence analysis catches disagreements in expected values before they become the oracle
 
 ## 5. References
 
@@ -206,24 +221,24 @@ The `evaluate` command re-scores all past runs with all three methods and displa
 ## Appendix B: Dataset Composition
 
 ```
-Total run files:    83
-Usable for scoring: 57 (69%)
-Excluded:           26 (no diffs, single agent, or missing scoring data)
+Total run files:    102
+Usable for scoring: 73 (72%)
+Excluded:           29 (no diffs, single agent, missing scoring data, or exit-127)
 
 By task type:
   TypeScript feature dev:  ~25 runs
   TypeScript bug fixes:    ~10 runs
   TypeScript refactoring:  ~8 runs
-  A* pathfinding (Py/TS):  ~6 runs
-  ML regression (Python):  ~3 runs
-  ML classification (Py):  ~3 runs
-  CLI/error handling:      ~2 runs
+  A* pathfinding (Py/TS):  ~10 runs
+  ML regression (Python):  ~6 runs
+  ML classification (Py):  ~6 runs
+  CLI/error handling:      ~4 runs
 
 By ensemble size:
   2-agent:  4 runs
-  3-agent:  9 runs
+  3-agent:  12 runs
   4-agent:  1 run
-  5-agent:  43 runs
+  5-agent:  56 runs
 ```
 
 ## Appendix C: Statistical Details
