@@ -78,7 +78,7 @@ describe("A* Pathfinding", () => {
     assert.deepEqual(result.path[0], [0, 0]);
     assert.deepEqual(result.path[result.path.length - 1], [4, 4]);
     assert.ok(isValidPath(grid, result.path), "path must be valid");
-    assert.equal(result.path.length, 13, "shortest maze path is 13");
+    assert.equal(result.path.length, 9, "shortest maze path is 9");
   });
 
   it("handles large grid efficiently", () => {

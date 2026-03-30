@@ -120,11 +120,26 @@ export async function runTests(
       };
     }
 
+    const exitCode = typeof e.code === "number" ? e.code : 1;
+    const output = (e.stdout ?? "") + (e.stderr ?? "");
+
+    // Exit 127 = "command not found" — the test infrastructure is broken,
+    // not the agent's code. Mark as skipped so scoring doesn't penalize.
+    if (exitCode === 127) {
+      return {
+        agentId,
+        passed: false,
+        output: `Test command not found (exit 127). The test script may not exist in the agent's clone.\n${output}`,
+        exitCode: 127,
+        skipped: true,
+      };
+    }
+
     return {
       agentId,
       passed: false,
-      output: (e.stdout ?? "") + (e.stderr ?? ""),
-      exitCode: typeof e.code === "number" ? e.code : 1,
+      output,
+      exitCode,
     };
   }
 }

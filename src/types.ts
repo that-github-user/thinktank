@@ -33,6 +33,8 @@ export interface TestResult {
   passed: boolean;
   output: string;
   exitCode: number;
+  /** True when the test command itself couldn't execute (e.g. exit 127 — command not found). */
+  skipped?: boolean;
 }
 
 export interface ConvergenceGroup {

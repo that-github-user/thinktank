@@ -173,6 +173,10 @@ export async function retry(opts: RunOptions): Promise<void> {
     const repoRoot = await getRepoRoot();
     const testWarning = await preflightTestRun(opts.testCmd, repoRoot);
     if (testWarning) {
+      if (testWarning.includes("exit 127")) {
+        console.error(`  ${testWarning}`);
+        process.exit(1);
+      }
       console.warn(`  ⚠ ${testWarning}`);
     }
   }
@@ -338,8 +342,20 @@ export async function preflightTestRun(testCmd: string, repoRoot: string): Promi
     return null;
   } catch (err: unknown) {
     const e = err as { stdout?: string; stderr?: string; code?: number | string };
+    const exitCode = typeof e.code === "number" ? e.code : 1;
     const output = ((e.stdout ?? "") + (e.stderr ?? "")).trim();
     const snippet = output.length > 200 ? `${output.slice(0, 200)}...` : output;
+
+    // Exit 127 = command not found. This is a setup error, not a test failure.
+    // Hard-error: don't waste API tokens if the test command doesn't exist.
+    if (exitCode === 127) {
+      return (
+        `Test command not found: "${testCmd}" (exit 127). ` +
+        "Ensure the test script exists and is committed to your repository.\n" +
+        (snippet ? `  Output: ${snippet}` : "")
+      );
+    }
+
     return (
       `Test command "${testCmd}" failed on the current branch before spawning agents. ` +
       "Your test environment may already be broken.\n" +
@@ -379,6 +395,11 @@ export async function run(opts: RunOptions): Promise<void> {
     const repoRoot = await getRepoRoot();
     const testWarning = await preflightTestRun(opts.testCmd, repoRoot);
     if (testWarning) {
+      // Exit 127 = command not found — hard error, don't waste API tokens
+      if (testWarning.includes("exit 127")) {
+        console.error(`  ${testWarning}`);
+        process.exit(1);
+      }
       console.warn(`  ⚠ ${testWarning}`);
     }
   }

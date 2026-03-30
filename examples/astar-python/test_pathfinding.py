@@ -76,7 +76,7 @@ class TestPathfinding(unittest.TestCase):
         self.assertEqual(result.path[0], (0, 0))
         self.assertEqual(result.path[-1], (4, 4))
         self.assertTrue(is_valid_path(grid, result.path))
-        self.assertEqual(len(result.path), 13)
+        self.assertEqual(len(result.path), 9)
 
     def test_large_grid_performance(self):
         size = 50

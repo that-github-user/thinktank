@@ -231,12 +231,15 @@ export function copelandRecommend(
   // Pre-compute per-agent criteria values
   const agentData = completed.map((agent) => {
     const test = testResults.find((t) => t.agentId === agent.id);
-    const testsPassed = test?.passed ? 1 : 0;
+    // Skipped tests (exit 127 = command not found) are treated as neutral —
+    // don't penalize agents when the test infrastructure itself is broken.
+    const testsSkipped = (test as { skipped?: boolean } | undefined)?.skipped === true;
+    const testsPassed = testsSkipped ? -1 : test?.passed ? 1 : 0;
     const group = convergence.find((g) => g.agents.includes(agent.id));
     const groupSize = group ? group.agents.length : 0;
     const { testFiles, nonTestFiles } = splitFilesByType(agent.filesChanged);
     const cappedTestFiles = effectiveTestFiles(testFiles, nonTestFiles);
-    return { id: agent.id, testsPassed, groupSize, nonTestFiles, cappedTestFiles };
+    return { id: agent.id, testsPassed, testsSkipped, groupSize, nonTestFiles, cappedTestFiles };
   });
 
   // Initialize scores
@@ -262,14 +265,18 @@ export function copelandRecommend(
       let bWins = 0;
 
       // Criterion 1: tests passed (more is better)
-      if (a.testsPassed > b.testsPassed) {
-        aWins++;
-        scoreMap.get(a.id)!.testsWins++;
-        scoreMap.get(b.id)!.testsWins--;
-      } else if (b.testsPassed > a.testsPassed) {
-        bWins++;
-        scoreMap.get(b.id)!.testsWins++;
-        scoreMap.get(a.id)!.testsWins--;
+      // Skip this criterion entirely when both agents have skipped tests
+      // (exit 127 = test command not found — not a code quality signal).
+      if (!(a.testsSkipped && b.testsSkipped)) {
+        if (a.testsPassed > b.testsPassed) {
+          aWins++;
+          scoreMap.get(a.id)!.testsWins++;
+          scoreMap.get(b.id)!.testsWins--;
+        } else if (b.testsPassed > a.testsPassed) {
+          bWins++;
+          scoreMap.get(b.id)!.testsWins++;
+          scoreMap.get(a.id)!.testsWins--;
+        }
       }
 
       // Criterion 2: convergence group size (larger is better)
