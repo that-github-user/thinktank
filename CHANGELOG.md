@@ -5,10 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.2] — 2026-03-30
 
 ### Added
-- `thinktank run` command — spawn N parallel Claude Code agents in isolated worktrees
+- Example projects: A* pathfinding (Python + TypeScript), ML regression, ML classification
+- Ensemble-generated test suite demonstrating two-phase workflow
+- Scoring evaluation: n=73 usable runs with Cochran's Q, Wilcoxon, Cliff's delta
+- README: documented two-phase ensemble test generation workflow
+- GitHub Packages publishing alongside npmjs.org
+
+### Fixed
+- Exit-127 (command not found) in test runner now marked as `skipped` instead of `failed` — prevents false penalties in Copeland scoring
+- Preflight check hard-errors on exit 127 instead of just warning — saves API tokens
+- Copeland scoring skips tests criterion when test command couldn't execute
+- `test_maze` assertion in A* examples (correct path length is 9, not 13)
+- CLI version read from package.json at runtime (no more stale hardcoded version)
+- Log messages: "Setting up agent environments" (was "Creating worktrees")
+
+## [0.1.1] — 2026-03-29
+
+### Fixed
+- Version bump for npm publish (0.1.0 was already claimed)
+- NPM trusted publishing requires NPM_TOKEN alongside OIDC
+
+## [0.1.0] — 2026-03-29
+
+### Added
+- `thinktank run` command — spawn N parallel Claude Code agents in isolated git clones
 - `thinktank apply` command — apply recommended or selected agent's changes
 - `thinktank apply --preview` — review diff with syntax highlighting before applying
 - `thinktank compare <A> <B>` — compare two agents' diffs side by side
