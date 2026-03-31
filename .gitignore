@@ -2,3 +2,8 @@ node_modules/
 dist/
 .thinktank/
 *.tgz
+
+__pycache__/
+*.pyc
+examples/*/package-lock.json
+scripts/batch-runs*.sh
