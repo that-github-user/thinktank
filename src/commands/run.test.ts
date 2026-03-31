@@ -468,7 +468,7 @@ describe("preflightTestRun", () => {
     // Exit 127 (command not found) gets a specific message
     assert.ok(
       result.includes("Test command not found") || result.includes("failed on the current branch"),
-      `Expected exit-127 or generic failure message, got: ${result.substring(0, 100)}`
+      `Expected exit-127 or generic failure message, got: ${result.substring(0, 100)}`,
     );
   });
 });
