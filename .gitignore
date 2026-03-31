@@ -7,3 +7,7 @@ __pycache__/
 *.pyc
 examples/*/package-lock.json
 scripts/batch-runs*.sh
+
+ralph-*.md
+ideation-log.md
+CLAUDE.md
