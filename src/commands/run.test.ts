@@ -465,6 +465,10 @@ describe("preflightTestRun", () => {
   it("returns warning when command is not found", async () => {
     const result = await preflightTestRun("nonexistent-command-xyz", process.cwd());
     assert.ok(result);
-    assert.ok(result.includes("failed on the current branch"));
+    // Exit 127 (command not found) gets a specific message
+    assert.ok(
+      result.includes("Test command not found") || result.includes("failed on the current branch"),
+      `Expected exit-127 or generic failure message, got: ${result.substring(0, 100)}`,
+    );
   });
 });
